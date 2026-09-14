@@ -79,6 +79,16 @@ function dataFile(): string {
   return path.join(config.dataDir, 'data.json');
 }
 
+/** Which backend is active ('json' local dev, 'pg' production). Valid after initDb(). */
+export function getBackend(): 'json' | 'pg' {
+  return backend;
+}
+/** The PostgreSQL pool when running on Postgres, else null. Used by feature modules
+ *  (e.g. feedback) that manage their own append-only tables directly. */
+export function getPool(): PgPool | null {
+  return pool;
+}
+
 // ---------------------------------------------------------------------------
 // initialisation
 // ---------------------------------------------------------------------------

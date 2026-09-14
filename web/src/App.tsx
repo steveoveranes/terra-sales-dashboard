@@ -5,6 +5,7 @@ import RawData from './pages/RawData';
 import Monthly from './pages/Monthly';
 import Tdjp from './pages/Tdjp';
 import Graphs from './pages/Graphs';
+import FeedbackBubble from './components/FeedbackBubble';
 
 type Tab = 'monthly' | 'graphs' | 'tdjp' | 'raw';
 
@@ -108,6 +109,8 @@ export default function App() {
         {tab === 'graphs' && <Graphs year={year} refreshKey={refreshKey} meta={meta} />}
         {tab === 'tdjp' && <Tdjp year={year} refreshKey={refreshKey} />}
       </div>
+
+      <FeedbackBubble />
     </div>
   );
 }

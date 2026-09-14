@@ -1,5 +1,7 @@
 import { Router } from 'express';
+import multer from 'multer';
 import { config } from '../config';
+import { addFeedback, getFeedback, listFeedback, videoPath } from '../feedback';
 import {
   BudgetMonth,
   flushDb,
@@ -77,4 +79,56 @@ api.post('/budget', async (req, res) => {
   setBudgetsForYear(year, months);
   await flushDb(); // make sure the budget is persisted before we confirm
   res.json({ status: 'ok', year, months: getBudgetsForYear(year) });
+});
+
+// ---------- feedback / ideas (the 🐛 bubble) ----------
+
+const uploadVideo = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 40 * 1024 * 1024 }, // ~40MB; a 1:30 clip at 800kbps is ~9MB
+});
+
+// Submit a new feedback/idea (optionally with a screen recording).
+api.post('/feedback', uploadVideo.single('video'), async (req, res) => {
+  try {
+    const b = req.body || {};
+    const durationRaw = parseInt(String(b.video_duration_seconds ?? ''), 10);
+    const { id } = await addFeedback(
+      {
+        url: b.url,
+        user_agent: req.headers['user-agent'] || '',
+        viewport: b.viewport,
+        user_text: b.text,
+        transcript: b.transcript,
+        video_duration_seconds: Number.isFinite(durationRaw) ? durationRaw : null,
+        submitter_name: b.submitter_name,
+        submitter_email: b.submitter_email,
+      },
+      req.file ? { buffer: req.file.buffer, ext: 'webm' } : undefined
+    );
+    res.json({ success: true, id });
+  } catch (e) {
+    res.status(500).json({ success: false, error: (e as Error).message });
+  }
+});
+
+// List all submissions (owner triage view — phase 2).
+api.get('/feedback', async (_req, res) => {
+  try {
+    res.json({ items: await listFeedback() });
+  } catch (e) {
+    res.status(500).json({ error: (e as Error).message });
+  }
+});
+
+// Stream a submission's recorded video.
+api.get('/feedback/:id/video', async (req, res) => {
+  const row = await getFeedback(parseInt(req.params.id, 10));
+  const p = row && row.video_filename ? videoPath(row.video_filename) : null;
+  if (!p) {
+    res.status(404).end();
+    return;
+  }
+  res.type('video/webm');
+  res.sendFile(p);
 });
