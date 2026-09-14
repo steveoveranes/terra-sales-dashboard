@@ -28,3 +28,7 @@ server.err.log
 # os
 .DS_Store
 Thumbs.db
+
+# auto-push watcher artefacts
+PUSH.trigger
+push-status.txt
