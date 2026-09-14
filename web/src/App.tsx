@@ -5,15 +5,17 @@ import RawData from './pages/RawData';
 import Monthly from './pages/Monthly';
 import Tdjp from './pages/Tdjp';
 import Graphs from './pages/Graphs';
+import Ideas from './pages/Ideas';
 import FeedbackBubble from './components/FeedbackBubble';
 
-type Tab = 'monthly' | 'graphs' | 'tdjp' | 'raw';
+type Tab = 'monthly' | 'graphs' | 'tdjp' | 'raw' | 'ideas';
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'monthly', label: 'Monthly overview' },
   { key: 'graphs', label: 'Graphs' },
   { key: 'tdjp', label: 'TDJP Input Format' },
   { key: 'raw', label: 'Raw HubSpot data' },
+  { key: 'ideas', label: 'Ideas & feedback' },
 ];
 
 export default function App() {
@@ -108,6 +110,7 @@ export default function App() {
         {tab === 'monthly' && <Monthly year={year} refreshKey={refreshKey} meta={meta} />}
         {tab === 'graphs' && <Graphs year={year} refreshKey={refreshKey} meta={meta} />}
         {tab === 'tdjp' && <Tdjp year={year} refreshKey={refreshKey} />}
+        {tab === 'ideas' && <Ideas refreshKey={refreshKey} />}
       </div>
 
       <FeedbackBubble />

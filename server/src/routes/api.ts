@@ -1,7 +1,14 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { config } from '../config';
-import { addFeedback, getFeedback, listFeedback, videoPath } from '../feedback';
+import {
+  addFeedback,
+  addFeedbackUpdate,
+  getFeedback,
+  listFeedback,
+  patchFeedback,
+  videoPath,
+} from '../feedback';
 import {
   BudgetMonth,
   flushDb,
@@ -118,6 +125,52 @@ api.get('/feedback', async (_req, res) => {
     res.json({ items: await listFeedback() });
   } catch (e) {
     res.status(500).json({ error: (e as Error).message });
+  }
+});
+
+// Triage a submission: change status / priority / internal notes (owner only — phase 2).
+api.post('/feedback/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const b = req.body || {};
+    const row = await patchFeedback(id, {
+      status: b.status,
+      priority: b.priority,
+      admin_notes: b.admin_notes,
+    });
+    if (!row) {
+      res.status(404).json({ error: 'not found' });
+      return;
+    }
+    res.json({ success: true, item: row });
+  } catch (e) {
+    res.status(500).json({ success: false, error: (e as Error).message });
+  }
+});
+
+// Add an update note to a submission's timeline, optionally moving its status.
+// A public update is what the submitter sees / is e-mailed about (phase 3).
+api.post('/feedback/:id/update', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const b = req.body || {};
+    if (!b.text || !String(b.text).trim()) {
+      res.status(400).json({ error: 'text is required' });
+      return;
+    }
+    const row = await addFeedbackUpdate(id, {
+      text: String(b.text),
+      author: b.author,
+      visibility: b.visibility === 'internal' ? 'internal' : 'public',
+      newStatus: b.status,
+    });
+    if (!row) {
+      res.status(404).json({ error: 'not found' });
+      return;
+    }
+    res.json({ success: true, item: row });
+  } catch (e) {
+    res.status(500).json({ success: false, error: (e as Error).message });
   }
 });
 

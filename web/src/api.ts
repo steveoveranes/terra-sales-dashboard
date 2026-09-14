@@ -75,6 +75,58 @@ export const saveBudget = (year: number, months: Record<string, BudgetMonth>) =>
     body: JSON.stringify({ year, months }),
   });
 
+// ---------- feedback / ideas (the 🐛 bubble + triage) ----------
+
+export interface FeedbackUpdate {
+  at: string;
+  author: string;
+  text: string;
+  visibility: 'public' | 'internal';
+  status?: string;
+}
+export interface Feedback {
+  id: number;
+  created_at: string;
+  url: string;
+  user_agent: string;
+  viewport: string;
+  user_text: string;
+  transcript: string;
+  video_filename: string | null;
+  video_duration_seconds: number | null;
+  submitter_name: string;
+  submitter_email: string;
+  submitter_user_id: string;
+  priority: string;
+  status: string;
+  status_changed_at: string | null;
+  admin_notes: string;
+  updates: FeedbackUpdate[];
+  last_owner_reminded_at: string | null;
+  last_user_notified_at: string | null;
+}
+
+export const listFeedback = () => j<{ items: Feedback[] }>('/api/feedback');
+export const patchFeedback = (
+  id: number,
+  patch: { status?: string; priority?: string; admin_notes?: string }
+) =>
+  j<{ success: boolean; item: Feedback }>(`/api/feedback/${id}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  });
+export const addFeedbackUpdate = (
+  id: number,
+  body: { text: string; author?: string; visibility?: 'public' | 'internal'; status?: string }
+) =>
+  j<{ success: boolean; item: Feedback }>(`/api/feedback/${id}/update`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+export const feedbackVideoUrl = (id: number) => `${API_BASE}/api/feedback/${id}/video`;
+
 export const getMeta = () => j<Meta>('/api/meta');
 export const getDeals = (year: number) => j<{ year: number; deals: Deal[] }>(`/api/deals?year=${year}`);
 export const getSyncStatus = () => j<SyncStatus>('/api/sync-status');

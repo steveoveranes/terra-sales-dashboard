@@ -27,6 +27,14 @@ export interface FeedbackInput {
   submitter_user_id?: string;
 }
 
+export interface FeedbackUpdate {
+  at: string; // ISO timestamp
+  author: string; // who wrote it (e.g. "Steven")
+  text: string; // the note
+  visibility: 'public' | 'internal'; // public updates are shown/emailed to the submitter
+  status?: string; // the status this update moved the item to, if any
+}
+
 export interface FeedbackRow extends FeedbackInput {
   id: number;
   created_at: string;
@@ -35,10 +43,16 @@ export interface FeedbackRow extends FeedbackInput {
   status: string;
   status_changed_at: string | null;
   admin_notes: string;
-  updates: any[];
+  updates: FeedbackUpdate[];
   last_owner_reminded_at: string | null;
   last_user_notified_at: string | null;
 }
+
+// Allowed lifecycle states and priorities (kept in sync with the triage UI).
+export const FEEDBACK_STATUSES = ['open', 'planned', 'in_progress', 'done', 'declined'] as const;
+export const FEEDBACK_PRIORITIES = ['low', 'normal', 'high', 'urgent'] as const;
+export type FeedbackStatus = (typeof FEEDBACK_STATUSES)[number];
+export type FeedbackPriority = (typeof FEEDBACK_PRIORITIES)[number];
 
 const videoDir = path.join(config.dataDir, 'uploads', 'feedback');
 const jsonFile = path.join(config.dataDir, 'feedback.json');
@@ -172,6 +186,104 @@ export async function getFeedback(id: number): Promise<FeedbackRow | null> {
     return (r.rows[0] as FeedbackRow) || null;
   }
   return loadJson().find((x) => Number(x.id) === Number(id)) || null;
+}
+
+// ---------- triage mutations (phase 2) ----------
+
+export interface FeedbackPatch {
+  status?: string;
+  priority?: string;
+  admin_notes?: string;
+}
+
+/** Update the triage fields of one item. Bumps status_changed_at when the status
+ *  actually changes. Returns the updated row (or null if not found). */
+export async function patchFeedback(id: number, patch: FeedbackPatch): Promise<FeedbackRow | null> {
+  const current = await getFeedback(id);
+  if (!current) return null;
+
+  const nextStatus =
+    patch.status && FEEDBACK_STATUSES.includes(patch.status as FeedbackStatus) ? patch.status : current.status;
+  const nextPriority =
+    patch.priority && FEEDBACK_PRIORITIES.includes(patch.priority as FeedbackPriority)
+      ? patch.priority
+      : current.priority;
+  const nextNotes = patch.admin_notes !== undefined ? patch.admin_notes : current.admin_notes;
+  const statusChanged = nextStatus !== current.status;
+  const statusChangedAt = statusChanged ? new Date().toISOString() : current.status_changed_at;
+
+  if (getBackend() === 'pg') {
+    await ensurePgSchema();
+    const pool = getPool()!;
+    const r = await pool.query(
+      `UPDATE feedback
+         SET status = $2, priority = $3, admin_notes = $4, status_changed_at = $5
+       WHERE id = $1
+       RETURNING *`,
+      [id, nextStatus, nextPriority, nextNotes, statusChangedAt]
+    );
+    return (r.rows[0] as FeedbackRow) || null;
+  }
+
+  const rows = loadJson();
+  const row = rows.find((x) => Number(x.id) === Number(id));
+  if (!row) return null;
+  row.status = nextStatus;
+  row.priority = nextPriority;
+  row.admin_notes = nextNotes;
+  row.status_changed_at = statusChangedAt;
+  saveJson(rows);
+  return row;
+}
+
+/** Append an update note to an item's timeline. If newStatus is given, also moves
+ *  the item to that status. A public update is what the submitter sees / is e-mailed
+ *  about (phase 3). Returns the updated row (or null if not found). */
+export async function addFeedbackUpdate(
+  id: number,
+  input: { text: string; author?: string; visibility?: 'public' | 'internal'; newStatus?: string }
+): Promise<FeedbackRow | null> {
+  const current = await getFeedback(id);
+  if (!current) return null;
+
+  const now = new Date().toISOString();
+  const nextStatus =
+    input.newStatus && FEEDBACK_STATUSES.includes(input.newStatus as FeedbackStatus)
+      ? input.newStatus
+      : current.status;
+  const statusChanged = nextStatus !== current.status;
+  const entry: FeedbackUpdate = {
+    at: now,
+    author: (input.author || 'Steven').slice(0, 120),
+    text: (input.text || '').slice(0, 4000),
+    visibility: input.visibility === 'internal' ? 'internal' : 'public',
+    ...(statusChanged ? { status: nextStatus } : {}),
+  };
+
+  if (getBackend() === 'pg') {
+    await ensurePgSchema();
+    const pool = getPool()!;
+    const r = await pool.query(
+      `UPDATE feedback
+         SET updates = COALESCE(updates, '[]'::jsonb) || $2::jsonb,
+             status = $3,
+             status_changed_at = CASE WHEN $4 THEN $5 ELSE status_changed_at END
+       WHERE id = $1
+       RETURNING *`,
+      [id, JSON.stringify([entry]), nextStatus, statusChanged, now]
+    );
+    return (r.rows[0] as FeedbackRow) || null;
+  }
+
+  const rows = loadJson();
+  const row = rows.find((x) => Number(x.id) === Number(id));
+  if (!row) return null;
+  row.updates = Array.isArray(row.updates) ? row.updates : [];
+  row.updates.push(entry);
+  row.status = nextStatus;
+  if (statusChanged) row.status_changed_at = now;
+  saveJson(rows);
+  return row;
 }
 
 /** Absolute path to a stored video, validated to stay inside the video dir. */
