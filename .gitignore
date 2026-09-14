@@ -1,0 +1,30 @@
+# dependencies / build output
+node_modules/
+dist/
+web-dist/
+server/web-dist/
+
+# runtime data (contains the budget + synced HubSpot data — never commit)
+data/
+data.json
+*.db
+*.db-journal
+*.sqlite
+
+# secrets & local env (keep .env.example, ignore real envs)
+.env
+.env.*
+!.env.example
+
+# build metadata / dev watcher artefacts
+.buildcounter.json
+RESTART.trigger
+build.log
+build-status.txt
+server.out.log
+server.err.log
+*.log
+
+# os
+.DS_Store
+Thumbs.db
