@@ -557,13 +557,13 @@ export default function Monthly({
         <div className="table-wrap">
           <table className="grid monthly">
             <colgroup>
-              <col style={{ width: '26%' }} />
-              <col style={{ width: '13%' }} />
-              <col style={{ width: '14%' }} />
-              <col style={{ width: '13%' }} />
-              <col style={{ width: '11%' }} />
-              <col style={{ width: '12%' }} />
-              <col style={{ width: '11%' }} />
+              <col style={{ width: '36%' }} /> {/* Deal name — widened so it fits on one line */}
+              <col style={{ width: '12%' }} /> {/* Sales pipeline */}
+              <col style={{ width: '9%' }} />  {/* Deal stage — short values (Paid/Invoiced) */}
+              <col style={{ width: '14%' }} /> {/* Owner */}
+              <col style={{ width: '10%' }} /> {/* Deal amount */}
+              <col style={{ width: '10%' }} /> {/* Cost of sales */}
+              <col style={{ width: '9%' }} />  {/* Margin */}
             </colgroup>
             <thead>
               <tr>
