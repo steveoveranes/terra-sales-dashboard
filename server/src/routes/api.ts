@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { config } from '../config';
 import {
   BudgetMonth,
+  flushDb,
   getBudgetsForYear,
   getDealsByYear,
   getMeta,
@@ -65,7 +66,7 @@ api.get('/budget', (req, res) => {
   res.json({ year, months: getBudgetsForYear(year) });
 });
 
-api.post('/budget', (req, res) => {
+api.post('/budget', async (req, res) => {
   const body = req.body || {};
   const year = parseInt(String(body.year), 10);
   if (!year) {
@@ -74,5 +75,6 @@ api.post('/budget', (req, res) => {
   }
   const months = (body.months || {}) as Record<string, BudgetMonth>;
   setBudgetsForYear(year, months);
+  await flushDb(); // make sure the budget is persisted before we confirm
   res.json({ status: 'ok', year, months: getBudgetsForYear(year) });
 });

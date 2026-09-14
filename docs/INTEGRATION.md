@@ -1,94 +1,89 @@
 # Sales Dashboard → TerraFlow integration plan
 
-This document is the blueprint for turning the standalone Terra **Sales Dashboard**
-into a page **inside TerraFlow** (the Django app `TerraQuoteSystem`, served at
-`https://terra-flow.ai`). It is written so the TerraFlow-side work can be picked up by
-**Niek**, who owns TerraFlow.
+This document is the blueprint for surfacing the Terra **Sales Dashboard** as a page
+**inside TerraFlow** (the Django app `TerraQuoteSystem`, served at
+`https://terra-flow.ai`), so it lives behind TerraFlow's login and navigation. It is
+written so the TerraFlow-side work can be picked up by **Niek**, who owns TerraFlow.
 
 > Ground rule: the Sales Dashboard team only changes **this** repo. All TerraFlow-side
-> changes (routes, views, templates, data endpoint, budget model) are made by the
-> TerraFlow owner. This document specifies exactly what those changes are.
+> changes (routing / reverse-proxy, a nav link) are made by the TerraFlow owner. This
+> document specifies exactly what those changes are.
 
-## Where we are today
+## Architecture decision (2026-09-14)
 
-- **Frontend:** React 18 + Vite + TypeScript (`web/`). Talks to a small backend over
-  `/api/*` (see `web/src/api.ts` for the exact contract).
-- **Backend (interim):** Node/Express (`server/`) that syncs HubSpot deals hourly and
-  stores the monthly **budget** in `data/data.json`. This backend is **temporary** —
-  Phase 3 replaces it with a TerraFlow endpoint.
-- Runs today as its own process on `:8080`.
+The Sales Dashboard keeps its **own backend and its own database** — it is not folded
+into TerraFlow. Reasons: we can keep developing independently, and a real database is
+handy for future data beyond the budget.
 
-## Target architecture
+- **Frontend:** React 18 + Vite + TypeScript (`web/`).
+- **Backend:** Node/Express (`server/`) — hourly HubSpot sync + the monthly **budget**,
+  serving the built frontend and a JSON API on `/api/*`.
+- **Database:** pluggable (`server/src/db.ts`). Local dev = a JSON file; production =
+  **PostgreSQL** via `DATABASE_URL`, pointed at a **dedicated database on the shared
+  Postgres server** (separate from TerraFlow, so we don't get in each other's way).
+  The app creates its own tables on startup. See `README.md` → *Database*.
 
-The Sales Dashboard becomes a **frontend-only** page that TerraFlow serves at
-`/sales-dashboard/`, behind TerraFlow's existing **allauth Google login** (already
-restricted to `@terra-inspectioneering.com`). Deal data and budget come from a small
-**TerraFlow JSON endpoint**; the Node backend is retired.
+TerraFlow's only job is to **put this behind its login and make it reachable** under
+`terra-flow.ai`. No TerraFlow data endpoint and no budget model are needed — that was
+an earlier idea, now dropped.
 
 ## Phased plan
 
-### Phase 0 — foundation (done / in progress)
-- This repo (`terra-sales-dashboard`) on GitHub as the single source of truth.
+### Phase 0 — foundation — DONE
+Public GitHub repo `terra-sales-dashboard` as the single source of truth.
 
 ### Phase 1 — make the frontend embeddable (Sales Dashboard side) — DONE
-Two build-time environment variables now control embedding (defaults keep the
-standalone run identical):
+Two build-time env vars control embedding (defaults keep the standalone run identical):
 
-- `VITE_BASE` — public path the assets are served from. Default `/`. For TerraFlow set
-  e.g. `/static/sales-dashboard/`.
-- `VITE_API_BASE` — prefix for the `/api/*` calls. Default `''` (same-origin). For
-  TerraFlow set `/sales-dashboard`, so calls go to `/sales-dashboard/api/...`.
+- `VITE_BASE` — public path the assets are served from. Default `/`. For a sub-path
+  mount set e.g. `/sales-dashboard/`.
+- `VITE_API_BASE` — prefix for the `/api/*` calls. Default `''` (same-origin). Only
+  needed if the API is reached on a different path than the page.
 
 The app has no client-side router, so no `basename` handling is needed.
 
-### Phase 2 — serve as a page in TerraFlow (TerraFlow side, Niek)
-1. **Build** the frontend in this repo with the embed variables set → outputs static
-   assets to `web/dist/` (with the configured `base`):
-   ```bash
-   cd web && npm ci
-   # macOS/Linux:
-   VITE_BASE=/static/sales-dashboard/ VITE_API_BASE=/sales-dashboard npm run build
-   # Windows PowerShell:
-   #   $env:VITE_BASE="/static/sales-dashboard/"; $env:VITE_API_BASE="/sales-dashboard"; npm run build
-   ```
-2. **Ship the assets** into TerraFlow's static tree, e.g. `static/sales-dashboard/`,
-   and run `python manage.py collectstatic`.
-3. **Template** `templates/sales_dashboard.html` that loads the built `index.html`'s
-   CSS/JS from `{% static 'sales-dashboard/...' %}`.
-4. **Route** in `quotes/urls.py`:
-   ```python
-   from django.contrib.auth.decorators import login_required
-   from django.views.generic import TemplateView
-   path('sales-dashboard/',
-        login_required(TemplateView.as_view(template_name='sales_dashboard.html')),
-        name='sales_dashboard'),
-   ```
-   The page now inherits the logged-in TerraFlow user — this covers the "login" wish.
+### Phase 1b — own PostgreSQL database (Sales Dashboard side) — DONE
+The backend runs on Postgres when `DATABASE_URL` is set (JSON file otherwise). Nothing
+to do here except, at deploy time, create the dedicated database and set the URL.
 
-### Phase 3 — data from TerraFlow, retire the Node backend (TerraFlow side, Niek)
-Add a small JSON API under `/sales-dashboard/api/` that returns the same shapes the
-frontend already expects (see `web/src/api.ts`). The frontend switches to it via
-`VITE_API_BASE`.
+### Phase 2 — surface it inside TerraFlow, behind login (TerraFlow side, Niek)
+Our backend runs as its own service on the Mac mini (say `http://localhost:8090`). Make
+it reachable at `terra-flow.ai/sales-dashboard/` **only for logged-in users**.
+Recommended approach — a small authenticated reverse-proxy view in Django:
 
-- `GET /sales-dashboard/api/deals?year=YYYY` → `{ year, deals: Deal[] }`, where each
-  `Deal` has: `id, year, deal_name, sales_pipeline, pipeline_id, deal_stage, stage_id,
-  owner, owner_id, customer, customer_id, deal_amount, cost_of_sales, margin,
-  close_date, execution_date, execution_month, deal_link, synced_at`.
-- `GET /sales-dashboard/api/meta` → pipelines, stages, owners, years (see `Meta` in
-  `web/src/api.ts`).
-- `GET /sales-dashboard/api/budget?year=YYYY` and
-  `POST /sales-dashboard/api/budget` → the monthly budget (revenue + margin per month).
-  This is the dashboard's only **write** data; store it in a small TerraFlow model.
+1. Run our service on the Mac mini (a dedicated port), with `DATABASE_URL` pointing at
+   its own database on the shared Postgres server.
+2. In TerraFlow, add a `@login_required` route for `sales-dashboard/` (and
+   `sales-dashboard/<path>`) that reverse-proxies to our service. Because the view is
+   `@login_required`, TerraFlow's existing allauth Google login (restricted to
+   `@terra-inspectioneering.com`) gates access — exactly the login we want.
+3. Add a link to the dashboard in TerraFlow's navigation.
 
-**Data source note:** TerraFlow's `Project` model already stores `hubspot_deal_amount`,
-owner, stage tags, dealname and `executed_date`, and TerraFlow pushes `cost_of_sales`
-to HubSpot. It does **not** currently keep `margin`/`cost_of_sales` as queryable
-per-deal fields, so the deals endpoint should get amount + cost + margin from HubSpot
-(reuse `hubspot_sync/hubspot_client.py`) — or those fields get added to the Project
-sync. Until Phase 3 lands, the dashboard keeps using its own HubSpot sync in `server/`.
+Build the frontend for the sub-path so asset URLs resolve:
+```bash
+cd web && npm ci
+# macOS/Linux:
+VITE_BASE=/sales-dashboard/ npm run build
+# Windows PowerShell:
+#   $env:VITE_BASE="/sales-dashboard/"; npm run build
+```
+(If a reverse-proxy strips the `/sales-dashboard` prefix before it reaches our service,
+`VITE_BASE` can stay `/`. Niek picks whichever matches the proxy setup.)
 
-## The API contract (authoritative)
+Alternative to a Django proxy: route the `/sales-dashboard` path straight to our
+service at the Cloudflare Tunnel / front layer. Login is then enforced by whatever
+guards that path; the Django `@login_required` proxy is the simplest way to guarantee it.
 
-`web/src/api.ts` in this repo is the source of truth for the JSON shapes. Build the
-Phase 3 endpoints to match it and the frontend needs no further change beyond
-`VITE_API_BASE`.
+### Deployment checklist (when we go live on the Mac mini)
+- Create a database on the shared Postgres server, e.g. `terra_sales_dashboard`.
+- Set `DATABASE_URL`, `HUBSPOT_TOKEN`, `USE_MOCK=0` in the service's `.env`.
+- Run the service (Docker or `node dist/index.js`) on its port; it creates its tables
+  and does a first sync.
+- Wire the TerraFlow route/proxy (Phase 2) and add the nav link.
+
+## The API (for reference)
+
+`web/src/api.ts` documents the JSON the frontend uses (`/api/deals`, `/api/meta`,
+`/api/budget`, `/api/sync-status`, `/api/refresh`, `/api/tdjp-upside`). With the
+own-backend model these are served by our own `server/` — TerraFlow does not
+reimplement them.

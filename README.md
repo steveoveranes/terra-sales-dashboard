@@ -5,8 +5,9 @@ This is **Phase 1**: the project skeleton, the HubSpot → database sync, and th
 **Raw HubSpot data** tab. The other three tabs (Monthly overview, Graphs, TDJP)
 are visible as placeholders and come in the next phases.
 
-It runs as **one Docker container**: a Node.js backend that syncs HubSpot into a
-local SQLite database and serves a React frontend.
+It runs as **one Docker container**: a Node.js backend that syncs HubSpot into its
+data store (a local JSON file by default, or PostgreSQL — see **Database** below)
+and serves a React frontend.
 
 > Note: this package was built for you but could not be test-built in the
 > Claude sandbox (the npm registry is blocked there). The first build happens on
@@ -102,9 +103,36 @@ Open http://localhost:8080
 | `SYNC_CRON` | Auto-sync schedule (cron). Default hourly `0 * * * *`. |
 | `PORT` | Port to listen on (default 8080). |
 | `HUBSPOT_PORTAL_ID` | Used to build deal links (default 2372383). |
+| `DATABASE_URL` | Empty = local JSON store (dev). A `postgresql://…` URL = use Postgres. |
 
 The app also syncs automatically every hour, and there is a **Refresh now**
 button in the top bar.
+
+---
+
+## Database
+
+The backend keeps its data in memory and persists it through a pluggable store:
+
+- **Local dev (default):** leave `DATABASE_URL` empty → data is written to a JSON
+  file in `./data/`. No database to install.
+- **Production:** set `DATABASE_URL` to a PostgreSQL connection string. On startup
+  the app creates its own tables (`budgets`, `deals`, `settings`, `pipelines`,
+  `stages`, `owners`, `tdjp_upside`, `sync_log`). Point it at a **dedicated
+  database** on the shared Postgres server so it stays separate from TerraFlow:
+  ```
+  DATABASE_URL=postgresql://user:password@localhost:5432/terra_sales_dashboard
+  ```
+  Only the **budget** is user-entered data; the deals and reference tables are a
+  re-syncable HubSpot cache.
+
+Want to test Postgres locally? Run one in Docker and point `DATABASE_URL` at it:
+```
+docker run --name tsd-pg -e POSTGRES_PASSWORD=dev -e POSTGRES_DB=terra_sales_dashboard \
+  -p 5432:5432 -d postgres:16
+# then in .env:
+DATABASE_URL=postgresql://postgres:dev@localhost:5432/terra_sales_dashboard
+```
 
 ---
 

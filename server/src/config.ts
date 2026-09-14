@@ -23,6 +23,11 @@ export const config = {
   dataDir: DATA_DIR,
   dbPath: process.env.DATABASE_PATH || path.join(DATA_DIR, 'app.db'),
 
+  // Persistence. When DATABASE_URL is set, the app stores its data in PostgreSQL
+  // (production: a dedicated database on the shared Postgres server). When it is
+  // empty, it falls back to a local JSON file in DATA_DIR (zero-config local dev).
+  databaseUrl: process.env.DATABASE_URL || '',
+
   hubspotToken: process.env.HUBSPOT_TOKEN || '',
   hubspotPortalId: process.env.HUBSPOT_PORTAL_ID || '2372383',
 

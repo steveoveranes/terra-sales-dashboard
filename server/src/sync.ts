@@ -2,6 +2,7 @@ import { config, yearsToSync } from './config';
 import {
   addSyncLog,
   DealRow,
+  flushDb,
   replaceDealsForYear,
   setSetting,
   upsertOwners,
@@ -140,6 +141,12 @@ export async function runSync(): Promise<{ status: string; message: string; coun
     });
     return { status: 'error', message, count };
   } finally {
+    // Persist everything written during the sync (Postgres backend; no-op for JSON).
+    try {
+      await flushDb();
+    } catch (e) {
+      console.error('[db] flush after sync failed', e);
+    }
     running = false;
   }
 }
