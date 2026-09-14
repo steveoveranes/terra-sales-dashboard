@@ -126,6 +126,42 @@ export const addFeedbackUpdate = (
     body: JSON.stringify(body),
   });
 export const feedbackVideoUrl = (id: number) => `${API_BASE}/api/feedback/${id}/video`;
+export const runFollowupSweep = () =>
+  j<{ success: boolean; ownerRemindedCount: number; ownerDigestSent: boolean; submitterHeartbeats: number; mailMode: string }>(
+    '/api/feedback-sweep',
+    { method: 'POST' }
+  );
+
+// ---------- application settings ----------
+
+export interface AppSetting {
+  key: string;
+  label: string;
+  group: string;
+  type: 'string' | 'int' | 'bool';
+  default: string;
+  value: string;
+  help?: string;
+  advanced?: boolean;
+}
+export interface MailStatus {
+  configured: boolean;
+  host: string;
+  user: string;
+}
+export const sendTestEmail = (to?: string) =>
+  j<{ success: boolean; mode: string; error: string | null; to: string }>('/api/mail-test', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(to ? { to } : {}),
+  });
+export const getSettings = () => j<{ settings: AppSetting[]; mail: MailStatus }>('/api/settings');
+export const saveSettings = (settings: Record<string, string | boolean | number>) =>
+  j<{ success: boolean; changed: string[]; settings: AppSetting[]; mail: MailStatus }>('/api/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ settings }),
+  });
 
 export const getMeta = () => j<Meta>('/api/meta');
 export const getDeals = (year: number) => j<{ year: number; deals: Deal[] }>(`/api/deals?year=${year}`);

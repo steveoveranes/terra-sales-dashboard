@@ -9,6 +9,9 @@ import {
   patchFeedback,
   videoPath,
 } from '../feedback';
+import { notifySubmitterOfUpdate, runFollowupSweep } from '../followup';
+import { applySettings, getSettingsForUi, mailStatus, owner as ownerCfg } from '../appSettings';
+import { sendMail } from '../mailer';
 import {
   BudgetMonth,
   flushDb,
@@ -168,7 +171,66 @@ api.post('/feedback/:id/update', async (req, res) => {
       res.status(404).json({ error: 'not found' });
       return;
     }
+    // Fire off the immediate submitter e-mail for a public update (best-effort,
+    // never blocks the response; no-op when we don't have their address yet).
+    const last = Array.isArray(row.updates) && row.updates.length ? row.updates[row.updates.length - 1] : null;
+    if (last && last.visibility === 'public') {
+      notifySubmitterOfUpdate(row, last).catch((e) =>
+        console.error('[feedback] submitter notify failed:', (e as Error).message)
+      );
+    }
     res.json({ success: true, item: row });
+  } catch (e) {
+    res.status(500).json({ success: false, error: (e as Error).message });
+  }
+});
+
+// Run the follow-up sweep on demand (owner digest + submitter heartbeats). Handy for
+// testing the e-mail loop without waiting for the schedule.
+api.post('/feedback-sweep', async (_req, res) => {
+  try {
+    const result = await runFollowupSweep();
+    res.json({ success: true, ...result });
+  } catch (e) {
+    res.status(500).json({ success: false, error: (e as Error).message });
+  }
+});
+
+// ---------- application settings ----------
+
+api.get('/settings', (_req, res) => {
+  res.json({ settings: getSettingsForUi(), mail: mailStatus() });
+});
+
+api.post('/settings', async (req, res) => {
+  try {
+    const changed = applySettings((req.body && req.body.settings) || req.body || {});
+    await flushDb(); // persist before confirming
+    res.json({ success: true, changed, settings: getSettingsForUi(), mail: mailStatus() });
+  } catch (e) {
+    res.status(500).json({ success: false, error: (e as Error).message });
+  }
+});
+
+// Send a one-off test e-mail so the owner can confirm the SMTP setup actually works.
+// Returns the transport result INCLUDING the error text, so problems are visible in
+// the UI instead of buried in the server log.
+api.post('/mail-test', async (req, res) => {
+  try {
+    const to = (req.body && String(req.body.to || '').trim()) || ownerCfg.email();
+    if (!to) {
+      res.status(400).json({ success: false, error: 'no recipient (set an owner e-mail first)' });
+      return;
+    }
+    const r = await sendMail({
+      to,
+      subject: '✅ Testmail — Terra Sales Dashboard',
+      text:
+        'Dit is een testbericht van het Terra Sales Dashboard.\n\n' +
+        'Als je dit ontvangt, werkt de e-mailconfiguratie (SMTP) correct en ' +
+        'kan de opvolg-loop reminders en updates versturen.\n\n— Terra Sales Dashboard',
+    });
+    res.json({ success: r.ok, mode: r.mode, error: r.error || null, to });
   } catch (e) {
     res.status(500).json({ success: false, error: (e as Error).message });
   }
