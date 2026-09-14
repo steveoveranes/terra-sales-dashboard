@@ -809,8 +809,12 @@ export default function Graphs({
   const marPctPrev = revPrev ? (marPrev / revPrev) * 100 : NaN;
   const nThis = fThis.length;
   const nPrev = fPrev.length;
-  const avgThis = nThis ? revThis / nThis : 0;
-  const avgPrev = nPrev ? revPrev / nPrev : 0;
+  // Average deal size ignores €0 deals (they only drag the average down); the sum
+  // already excludes them since they add nothing, so we only adjust the denominator.
+  const nAmtThis = fThis.filter((d) => d.deal_amount > 0).length;
+  const nAmtPrev = fPrev.filter((d) => d.deal_amount > 0).length;
+  const avgThis = nAmtThis ? revThis / nAmtThis : 0;
+  const avgPrev = nAmtPrev ? revPrev / nAmtPrev : 0;
 
   const budgetMonths: Record<string, BudgetMonth> = budget?.months || {};
   const budgetRevYear = useMemo(
@@ -934,9 +938,19 @@ export default function Graphs({
     }
     return arr;
   }, [fThis]);
+  // per-month count of deals WITH an amount (>0), for the avg-deal-size sparkline
+  const amtCountByMonth = useMemo(() => {
+    const arr = new Array(12).fill(0);
+    for (const d of fThis) {
+      if (!(d.deal_amount > 0)) continue;
+      const i = monthOfDeal(d);
+      if (i >= 0) arr[i] += 1;
+    }
+    return arr;
+  }, [fThis]);
   const avgByMonth = useMemo(
-    () => revByMonth.map((r, i) => (countByMonth[i] ? r / countByMonth[i] : 0)),
-    [revByMonth, countByMonth]
+    () => revByMonth.map((r, i) => (amtCountByMonth[i] ? r / amtCountByMonth[i] : 0)),
+    [revByMonth, amtCountByMonth]
   );
   const marPctByMonth = useMemo(
     () => revByMonth.map((r, i) => (r ? (marByMonth[i] / r) * 100 : 0)),
@@ -1169,7 +1183,7 @@ export default function Graphs({
       {/* KPI ROW */}
       <div className="kpi-row">
         <Kpi
-          label={`Sales ${periodLabel}`}
+          label={`Sales forecast ${periodLabel}`}
           value={fmtInt(revThis)}
           delta={pctDelta(revThis, revPrev)}
           sub={`vs ${year - 1}`}
@@ -1180,7 +1194,7 @@ export default function Graphs({
           noteColor={revToMeet > 0 ? AMBER : GREEN}
         />
         <Kpi
-          label={`Margin ${periodLabel}`}
+          label={`Margin forecast ${periodLabel}`}
           value={fmtInt(marThis)}
           delta={pctDelta(marThis, marPrev)}
           sub={`vs ${year - 1}`}
