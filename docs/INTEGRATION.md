@@ -30,16 +30,27 @@ restricted to `@terra-inspectioneering.com`). Deal data and budget come from a s
 ### Phase 0 — foundation (done / in progress)
 - This repo (`terra-sales-dashboard`) on GitHub as the single source of truth.
 
-### Phase 1 — make the frontend embeddable (Sales Dashboard side)
-- Make the Vite `base` path configurable (e.g. build with
-  `base: '/static/sales-dashboard/'`) so assets resolve when served by Django.
-- Make the API base URL configurable (`VITE_API_BASE`), default `''` (same-origin),
-  so the same build can talk to the interim Node backend **or** the TerraFlow endpoint.
-- No behaviour change for the current standalone run.
+### Phase 1 — make the frontend embeddable (Sales Dashboard side) — DONE
+Two build-time environment variables now control embedding (defaults keep the
+standalone run identical):
+
+- `VITE_BASE` — public path the assets are served from. Default `/`. For TerraFlow set
+  e.g. `/static/sales-dashboard/`.
+- `VITE_API_BASE` — prefix for the `/api/*` calls. Default `''` (same-origin). For
+  TerraFlow set `/sales-dashboard`, so calls go to `/sales-dashboard/api/...`.
+
+The app has no client-side router, so no `basename` handling is needed.
 
 ### Phase 2 — serve as a page in TerraFlow (TerraFlow side, Niek)
-1. **Build** the frontend in this repo: `cd web && npm ci && npm run build` → outputs
-   static assets to `web/dist/` (with the configured `base`).
+1. **Build** the frontend in this repo with the embed variables set → outputs static
+   assets to `web/dist/` (with the configured `base`):
+   ```bash
+   cd web && npm ci
+   # macOS/Linux:
+   VITE_BASE=/static/sales-dashboard/ VITE_API_BASE=/sales-dashboard npm run build
+   # Windows PowerShell:
+   #   $env:VITE_BASE="/static/sales-dashboard/"; $env:VITE_API_BASE="/sales-dashboard"; npm run build
+   ```
 2. **Ship the assets** into TerraFlow's static tree, e.g. `static/sales-dashboard/`,
    and run `python manage.py collectstatic`.
 3. **Template** `templates/sales_dashboard.html` that loads the built `index.html`'s

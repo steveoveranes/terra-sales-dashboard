@@ -39,8 +39,14 @@ export interface SyncStatus {
   error: string | null;
 }
 
+// API base prefix. Empty by default → same-origin '/api/...' (standalone run).
+// When the dashboard is embedded (e.g. served by TerraFlow under /sales-dashboard/),
+// build with VITE_API_BASE=/sales-dashboard so calls go to '/sales-dashboard/api/...'.
+const API_BASE = ((import.meta as any).env?.VITE_API_BASE ?? '').replace(/\/+$/, '');
+
 async function j<T>(url: string, init?: RequestInit): Promise<T> {
-  const r = await fetch(url, init);
+  const full = url.startsWith('/api') ? API_BASE + url : url;
+  const r = await fetch(full, init);
   if (!r.ok) throw new Error(await r.text());
   return r.json() as Promise<T>;
 }
