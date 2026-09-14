@@ -2,10 +2,12 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs';
 import cron from 'node-cron';
-import { config, yearsToSync } from './config';
+import { config } from './config';
 import { initDb, flushDb, getYearsWithData } from './db';
 import { api } from './routes/api';
 import { runSync } from './sync';
+import { startFollowupScheduler } from './followup';
+import { sync as syncCfg, yearsToSyncEff } from './appSettings';
 
 async function main() {
   await initDb(); // connect the store (JSON or Postgres) and load data into memory
@@ -30,17 +32,22 @@ async function main() {
       .catch((e) => console.error('[startup sync] failed', e));
   }
 
-  // Scheduled sync.
-  if (cron.validate(config.syncCron)) {
-    cron.schedule(config.syncCron, () => {
+  // Scheduled sync. The cadence is read once at startup (the watcher restarts on
+  // every rebuild, so a change from the Settings screen applies on the next build).
+  const syncCron = syncCfg.cron() || config.syncCron;
+  if (cron.validate(syncCron)) {
+    cron.schedule(syncCron, () => {
       runSync()
         .then((r) => console.log('[scheduled sync]', r.status, '-', r.message))
         .catch((e) => console.error('[scheduled sync] failed', e));
     });
-    console.log(`[scheduler] auto-sync scheduled: ${config.syncCron}`);
+    console.log(`[scheduler] auto-sync scheduled: ${syncCron}`);
   } else {
-    console.warn(`[scheduler] invalid SYNC_CRON "${config.syncCron}", auto-sync disabled`);
+    console.warn(`[scheduler] invalid sync cron "${syncCron}", auto-sync disabled`);
   }
+
+  // Ideas & feedback follow-up loop (owner reminders + submitter updates).
+  startFollowupScheduler();
 
   // Persist any pending writes on shutdown.
   for (const sig of ['SIGINT', 'SIGTERM'] as const) {
@@ -55,7 +62,7 @@ async function main() {
     console.log(
       `Terra Sales Dashboard: http://localhost:${config.port}  (data source: ${
         config.useMock ? 'MOCK sample data' : 'HubSpot'
-      }, years: ${yearsToSync().join(', ')})`
+      }, years: ${yearsToSyncEff().join(', ')})`
     );
   });
 }

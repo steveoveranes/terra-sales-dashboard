@@ -1,4 +1,5 @@
-import { config, yearsToSync } from './config';
+import { config } from './config';
+import { yearsToSyncEff } from './appSettings';
 import {
   addSyncLog,
   DealRow,
@@ -76,7 +77,7 @@ export async function runSync(): Promise<{ status: string; message: string; coun
   const started = new Date().toISOString();
   let count = 0;
   const source = config.useMock ? 'mock' : 'hubspot';
-  const years = yearsToSync();
+  const years = yearsToSyncEff();
 
   try {
     if (config.useMock) {

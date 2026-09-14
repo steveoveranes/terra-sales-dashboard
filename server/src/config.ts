@@ -72,6 +72,32 @@ export const config = {
   useMock: process.env.USE_MOCK === '1' || !process.env.HUBSPOT_TOKEN,
 
   webDist: process.env.WEB_DIST || path.join(__dirname, '..', 'web-dist'),
+
+  // ---- Follow-up e-mail (the 🐛 idea/feedback loop, phase 3) ----
+  // Reuses the same route TerraFlow uses: Gmail SMTP (smtp.gmail.com:587, STARTTLS)
+  // with a Gmail app-password. Put the same credentials TerraFlow uses in .env.
+  // When SMTP_USER/SMTP_PASS are empty the mailer runs in "console" mode: it logs
+  // what it *would* send instead of sending (safe local dev, mirrors Django's
+  // console EmailBackend default).
+  smtpHost: process.env.SMTP_HOST || 'smtp.gmail.com',
+  smtpPort: Number(process.env.SMTP_PORT || 587),
+  smtpSecure: process.env.SMTP_SECURE === '1', // false → STARTTLS on 587
+  smtpUser: process.env.SMTP_USER || '',
+  smtpPass: process.env.SMTP_PASS || '',
+  // Envelope From. Defaults to the SMTP user (Gmail requires From == authenticated user).
+  mailFrom: process.env.MAIL_FROM || process.env.SMTP_USER || '',
+  // Where owner reminders ("idea X of person Y has waited N days") are sent.
+  ownerEmail: process.env.OWNER_EMAIL || 'sverver@terra-inspectioneering.com',
+  ownerName: process.env.OWNER_NAME || 'Steven',
+  // Public URL of the dashboard, used to deep-link into the triage view from e-mails.
+  appBaseUrl: (process.env.APP_BASE_URL || 'http://localhost:8080').replace(/\/+$/, ''),
+  // Follow-up scheduler cadence and thresholds.
+  followupCron: process.env.FOLLOWUP_CRON || '0 8 * * 1-5', // weekdays 08:00 (business tz)
+  followupEnabled: process.env.FOLLOWUP_ENABLED !== '0', // on by default
+  ownerReminderWorkdays: Number(process.env.OWNER_REMINDER_WORKDAYS || 3), // nudge after > N workdays open
+  ownerReminderRepeatDays: Number(process.env.OWNER_REMINDER_REPEAT_DAYS || 7), // then weekly
+  ownerEscalateWorkdays: Number(process.env.OWNER_ESCALATE_WORKDAYS || 10), // flag as urgent beyond this
+  userUpdateRepeatDays: Number(process.env.USER_UPDATE_REPEAT_DAYS || 7), // keep submitter posted ≥ weekly
 };
 
 export type Config = typeof config;

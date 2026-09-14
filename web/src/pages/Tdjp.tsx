@@ -103,7 +103,15 @@ function fillSubtotals(g: Grid) {
 
 const fmt = (n: number) => Math.round(n).toLocaleString('nl-NL');
 
-export default function Tdjp({ year, refreshKey }: { year: number; refreshKey: number }) {
+export default function Tdjp({
+  year,
+  refreshKey,
+  defaultCurrency,
+}: {
+  year: number;
+  refreshKey: number;
+  defaultCurrency?: string;
+}) {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -113,7 +121,9 @@ export default function Tdjp({ year, refreshKey }: { year: number; refreshKey: n
   // EUR -> USD/JPY conversion (rate fetched live only while a currency is active).
   // 'eur' = no conversion; 'usd' and 'jpy' are mutually exclusive.
   type Cur = 'eur' | 'usd' | 'jpy';
-  const [cur, setCur] = useState<Cur>('eur');
+  const [cur, setCur] = useState<Cur>(
+    defaultCurrency === 'usd' || defaultCurrency === 'jpy' ? defaultCurrency : 'eur'
+  );
   const [rate, setRate] = useState<number | null>(null);
   const [rateLoading, setRateLoading] = useState(false);
   const [rateError, setRateError] = useState(false);

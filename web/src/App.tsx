@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { getMeta, getSyncStatus, refresh, Meta, SyncStatus } from './api';
 import { BUILD_NUMBER } from './buildInfo';
 import RawData from './pages/RawData';
@@ -6,9 +6,10 @@ import Monthly from './pages/Monthly';
 import Tdjp from './pages/Tdjp';
 import Graphs from './pages/Graphs';
 import Ideas from './pages/Ideas';
+import Settings from './pages/Settings';
 import FeedbackBubble from './components/FeedbackBubble';
 
-type Tab = 'monthly' | 'graphs' | 'tdjp' | 'raw' | 'ideas';
+type Tab = 'monthly' | 'graphs' | 'tdjp' | 'raw' | 'ideas' | 'settings';
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'monthly', label: 'Monthly overview' },
@@ -16,15 +17,33 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'tdjp', label: 'TDJP Input Format' },
   { key: 'raw', label: 'Raw HubSpot data' },
   { key: 'ideas', label: 'Ideas & feedback' },
+  { key: 'settings', label: '⚙ Settings' },
 ];
+
+// Allow deep-linking straight to a tab, e.g. the "open triage view" link in the
+// follow-up e-mails uses ?tab=ideas.
+function urlTab(): Tab | null {
+  try {
+    const q = new URLSearchParams(window.location.search).get('tab');
+    const keys = TABS.map((t) => t.key) as string[];
+    if (q && keys.includes(q)) return q as Tab;
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+function initialTab(): Tab {
+  return urlTab() ?? 'monthly';
+}
 
 export default function App() {
   const [meta, setMeta] = useState<Meta | null>(null);
   const [year, setYear] = useState<number>(new Date().getFullYear());
-  const [tab, setTab] = useState<Tab>('monthly');
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [sync, setSync] = useState<SyncStatus | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const defaultTabApplied = useRef(false);
 
   async function loadMeta() {
     const m = await getMeta();
@@ -32,6 +51,12 @@ export default function App() {
     // default to the most recent year that actually has data, else the latest available
     const preferred = m.dataYears.length ? m.dataYears[m.dataYears.length - 1] : m.years[m.years.length - 1];
     setYear((y) => (m.dataYears.includes(y) ? y : preferred));
+    // apply the configured default tab once, unless the URL asked for a specific tab
+    if (!defaultTabApplied.current && !urlTab() && m.defaultTab) {
+      const keys = TABS.map((t) => t.key) as string[];
+      if (keys.includes(m.defaultTab)) setTab(m.defaultTab as Tab);
+    }
+    defaultTabApplied.current = true;
   }
 
   async function loadSync() {
@@ -109,8 +134,9 @@ export default function App() {
         {tab === 'raw' && <RawData year={year} refreshKey={refreshKey} />}
         {tab === 'monthly' && <Monthly year={year} refreshKey={refreshKey} meta={meta} />}
         {tab === 'graphs' && <Graphs year={year} refreshKey={refreshKey} meta={meta} />}
-        {tab === 'tdjp' && <Tdjp year={year} refreshKey={refreshKey} />}
+        {tab === 'tdjp' && <Tdjp year={year} refreshKey={refreshKey} defaultCurrency={meta?.defaultCurrency} />}
         {tab === 'ideas' && <Ideas refreshKey={refreshKey} />}
+        {tab === 'settings' && <Settings refreshKey={refreshKey} />}
       </div>
 
       <FeedbackBubble />

@@ -286,6 +286,41 @@ export async function addFeedbackUpdate(
   return row;
 }
 
+// ---------- follow-up bookkeeping (phase 3) ----------
+
+/** Mark that the owner was reminded about these items just now. */
+export async function markOwnerReminded(ids: number[]): Promise<void> {
+  if (!ids.length) return;
+  const now = new Date().toISOString();
+  if (getBackend() === 'pg') {
+    await ensurePgSchema();
+    const pool = getPool()!;
+    await pool.query(`UPDATE feedback SET last_owner_reminded_at = $2 WHERE id = ANY($1)`, [ids, now]);
+    return;
+  }
+  const rows = loadJson();
+  const set = new Set(ids.map(Number));
+  for (const r of rows) if (set.has(Number(r.id))) r.last_owner_reminded_at = now;
+  saveJson(rows);
+}
+
+/** Mark that the submitter of an item was notified just now. */
+export async function markUserNotified(id: number): Promise<void> {
+  const now = new Date().toISOString();
+  if (getBackend() === 'pg') {
+    await ensurePgSchema();
+    const pool = getPool()!;
+    await pool.query(`UPDATE feedback SET last_user_notified_at = $2 WHERE id = $1`, [id, now]);
+    return;
+  }
+  const rows = loadJson();
+  const r = rows.find((x) => Number(x.id) === Number(id));
+  if (r) {
+    r.last_user_notified_at = now;
+    saveJson(rows);
+  }
+}
+
 /** Absolute path to a stored video, validated to stay inside the video dir. */
 export function videoPath(filename: string): string | null {
   if (!filename) return null;

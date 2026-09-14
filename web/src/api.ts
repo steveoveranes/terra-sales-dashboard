@@ -27,6 +27,8 @@ export interface Meta {
   years: number[];
   dataYears: number[];
   defaultHiddenStages: string[];
+  defaultTab?: string;
+  defaultCurrency?: string;
   useMock: boolean;
   portalId: string;
 }
@@ -138,11 +140,12 @@ export interface AppSetting {
   key: string;
   label: string;
   group: string;
-  type: 'string' | 'int' | 'bool';
+  type: 'string' | 'int' | 'bool' | 'enum';
   default: string;
   value: string;
   help?: string;
   advanced?: boolean;
+  options?: { value: string; label: string }[];
 }
 export interface MailStatus {
   configured: boolean;

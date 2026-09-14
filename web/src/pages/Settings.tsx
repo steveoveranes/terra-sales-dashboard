@@ -139,6 +139,17 @@ export default function Settings({ refreshKey }: { refreshKey: number }) {
         />
       );
     }
+    if (d.type === 'enum') {
+      return (
+        <select className="select set-input" value={v} onChange={(e) => setVal(d.key, e.target.value)}>
+          {(d.options || []).map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      );
+    }
     return (
       <input
         className="set-input"

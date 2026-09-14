@@ -10,7 +10,14 @@ import {
   videoPath,
 } from '../feedback';
 import { notifySubmitterOfUpdate, runFollowupSweep } from '../followup';
-import { applySettings, getSettingsForUi, mailStatus, owner as ownerCfg } from '../appSettings';
+import {
+  applySettings,
+  getSettingsForUi,
+  mailStatus,
+  owner as ownerCfg,
+  sync as syncCfg,
+  display as displayCfg,
+} from '../appSettings';
 import { sendMail } from '../mailer';
 import {
   BudgetMonth,
@@ -38,13 +45,15 @@ api.get('/meta', (_req, res) => {
   const dataYears = getYearsWithData();
   const current = new Date().getFullYear();
   const avail = new Set<number>();
-  for (let y = config.syncStartYear; y <= current + 1; y++) avail.add(y);
+  for (let y = syncCfg.startYear() || config.syncStartYear; y <= current + 1; y++) avail.add(y);
   dataYears.forEach((y) => avail.add(y));
   res.json({
     ...meta,
     years: Array.from(avail).sort((a, b) => a - b),
     dataYears,
-    defaultHiddenStages: config.excludedStageLabels,
+    defaultHiddenStages: syncCfg.excludedStages(),
+    defaultTab: displayCfg.defaultTab(),
+    defaultCurrency: displayCfg.defaultCurrency(),
     useMock: config.useMock,
     portalId: config.hubspotPortalId,
   });
