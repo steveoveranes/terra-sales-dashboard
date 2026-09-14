@@ -110,26 +110,28 @@ export default function Tdjp({ year, refreshKey }: { year: number; refreshKey: n
   const [copied, setCopied] = useState<string>('');
   const [upside, setUpside] = useState<TdjpUpside | null>(null);
 
-  // EUR -> USD conversion (rate fetched live only while the box is checked)
-  const [usd, setUsd] = useState(false);
+  // EUR -> USD/JPY conversion (rate fetched live only while a currency is active).
+  // 'eur' = no conversion; 'usd' and 'jpy' are mutually exclusive.
+  type Cur = 'eur' | 'usd' | 'jpy';
+  const [cur, setCur] = useState<Cur>('eur');
   const [rate, setRate] = useState<number | null>(null);
   const [rateLoading, setRateLoading] = useState(false);
   const [rateError, setRateError] = useState(false);
 
-  async function fetchRate() {
+  async function fetchRate(target: 'USD' | 'JPY') {
     setRateLoading(true);
     setRateError(false);
     try {
       let r: number | undefined;
       try {
-        const j = await fetch('https://api.frankfurter.app/latest?from=EUR&to=USD').then((x) => x.json());
-        r = j?.rates?.USD;
+        const j = await fetch(`https://api.frankfurter.app/latest?from=EUR&to=${target}`).then((x) => x.json());
+        r = j?.rates?.[target];
       } catch {
         /* try fallback */
       }
       if (!r) {
         const j = await fetch('https://open.er-api.com/v6/latest/EUR').then((x) => x.json());
-        r = j?.rates?.USD;
+        r = j?.rates?.[target];
       }
       if (!r || !isFinite(r)) throw new Error('no rate');
       setRate(r);
@@ -141,20 +143,22 @@ export default function Tdjp({ year, refreshKey }: { year: number; refreshKey: n
     }
   }
 
-  function toggleUsd(on: boolean) {
-    setUsd(on);
+  // Toggle a currency on/off. Checking one turns the other off; unchecking → euros.
+  function toggleCur(target: 'usd' | 'jpy', on: boolean) {
+    setRate(null);
+    setRateError(false);
     if (on) {
-      setRate(null);
-      fetchRate(); // fetch a fresh rate every time it's switched on
+      setCur(target);
+      fetchRate(target === 'usd' ? 'USD' : 'JPY'); // fresh rate every time it's switched on
     } else {
-      setRate(null); // back to euros -> the rate label becomes irrelevant and disappears
-      setRateError(false);
+      setCur('eur');
     }
   }
 
   // convert a k-EUR value to the displayed currency
-  const conv = (v: number) => (usd && rate ? v * rate : v);
-  const currencyLabel = usd && rate ? 'k USD' : 'k EUR';
+  const conv = (v: number) => (cur !== 'eur' && rate ? v * rate : v);
+  const currencyLabel = cur === 'usd' && rate ? 'k USD' : cur === 'jpy' && rate ? 'k JPY' : 'k EUR';
+  const ratePairLabel = cur === 'jpy' ? 'EUR/JPY' : 'EUR/USD';
 
   useEffect(() => {
     let cancelled = false;
@@ -270,14 +274,18 @@ export default function Tdjp({ year, refreshKey }: { year: number; refreshKey: n
       <div className="tdjp-bar">
         <div className="tdjp-bar-left">
           <span className="tdjp-title">Revenue Input Sheet — {year}</span>
+          <span style={{ fontWeight: 600 }}>Convert to</span>
           <label className="toggle-chip">
-            <input type="checkbox" checked={usd} onChange={(e) => toggleUsd(e.target.checked)} /> Convert to $USD
+            <input type="checkbox" checked={cur === 'usd'} onChange={(e) => toggleCur('usd', e.target.checked)} /> $USD
           </label>
-          {usd && rateLoading && <span className="tdjp-sub">fetching rate…</span>}
-          {usd && !rateLoading && rate && (
-            <span className="tdjp-sub">Actual retrieved EUR/USD exchange rate: {rate.toFixed(4)}</span>
+          <label className="toggle-chip">
+            <input type="checkbox" checked={cur === 'jpy'} onChange={(e) => toggleCur('jpy', e.target.checked)} /> ¥JPY
+          </label>
+          {cur !== 'eur' && rateLoading && <span className="tdjp-sub">fetching rate…</span>}
+          {cur !== 'eur' && !rateLoading && rate && (
+            <span className="tdjp-sub">Actual retrieved {ratePairLabel} exchange rate: {rate.toFixed(4)}</span>
           )}
-          {usd && !rateLoading && rateError && (
+          {cur !== 'eur' && !rateLoading && rateError && (
             <span className="tdjp-sub" style={{ color: 'var(--status-red)' }}>
               exchange rate unavailable — showing EUR
             </span>
