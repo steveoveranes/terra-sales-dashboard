@@ -56,10 +56,16 @@ async function j<T>(url: string, init?: RequestInit): Promise<T> {
 export interface TdjpUpside {
   year: number;
   rows: Record<string, number[]>;
-  source: 'sheet' | 'none' | 'error';
+  updatedAt: string | null;
+  source: 'db' | 'seeded' | 'none';
 }
-export const getTdjpUpside = (force = false) =>
-  j<TdjpUpside>('/api/tdjp-upside' + (force ? '?force=1' : ''));
+export const getTdjpUpside = (year: number) => j<TdjpUpside>(`/api/tdjp-upside?year=${year}`);
+export const saveTdjpUpside = (year: number, rows: Record<number, number[]>) =>
+  j<{ success: boolean } & TdjpUpside>('/api/tdjp-upside', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ year, rows }),
+  });
 
 export interface BudgetMonth {
   budget_amount: number;

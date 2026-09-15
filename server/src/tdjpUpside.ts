@@ -1,20 +1,62 @@
 import { config } from './config';
+import { getSetting, setSetting, flushDb } from './db';
 
-// Reads the manual "upside" (TDJP block 3) live from the published CSV of the
-// Google Sheet's "TDJP Input Format" tab. Only the LEAF rows are read
-// (Germany, Netherlands, Offshore/R&D, X1, Others); the dashboard computes the
-// subtotals itself, so the (empty) TI subtotal in the sheet is not a problem.
+// TDJP block 3 — "Forecast Revenue (Not a hard commit / upside)".
+//
+// These numbers used to be typed by hand into a Google Sheet and read here from
+// its published CSV. They now live in OUR database (per year), edited straight from
+// the dashboard's TDJP tab. Values are whole k-EUR (thousands of euros), 5 leaf
+// rows × 12 months, always in EUR.
+//
+// Migration: the first time a year is read and the database has nothing yet, we do
+// a one-time seed from the old published sheet (for the legacy forecast year only),
+// so Tsuyoshi's existing numbers are preserved automatically. After that it is
+// database-only and the sheet is never touched again.
 
 export interface UpsideData {
   year: number;
   rows: Record<number, number[]>; // leaf row key -> 12 monthly k-EUR values
-  source: 'sheet' | 'none' | 'error';
+  updatedAt: string | null; // ISO timestamp of the last edit (or seed)
+  source: 'db' | 'seeded' | 'none';
 }
 
+const LEAF_KEYS = [12, 13, 14, 16, 17];
 const ZERO = () => new Array(12).fill(0);
 function emptyRows(): Record<number, number[]> {
-  return { 12: ZERO(), 13: ZERO(), 14: ZERO(), 16: ZERO(), 17: ZERO() };
+  const r: Record<number, number[]> = {};
+  for (const k of LEAF_KEYS) r[k] = ZERO();
+  return r;
 }
+const settingKey = (year: number) => `tdjp.upside.${year}`;
+
+/** Coerce arbitrary input into exactly 5 leaf rows × 12 whole-number values. */
+export function sanitizeRows(input: unknown): Record<number, number[]> {
+  const out = emptyRows();
+  const obj = (input || {}) as Record<string, unknown>;
+  for (const k of LEAF_KEYS) {
+    const src = (obj[k] ?? obj[String(k)]) as unknown;
+    if (Array.isArray(src)) {
+      for (let m = 0; m < 12; m++) {
+        const n = Math.round(Number(src[m]));
+        out[k][m] = Number.isFinite(n) ? n : 0;
+      }
+    }
+  }
+  return out;
+}
+
+function readDb(year: number): { rows: Record<number, number[]>; updatedAt: string | null } | null {
+  const raw = getSetting(settingKey(year));
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return { rows: sanitizeRows(parsed.rows), updatedAt: parsed.updatedAt || null };
+  } catch {
+    return null;
+  }
+}
+
+// ---- one-time legacy seed from the published Google Sheet CSV ----
 
 function parseCSV(s: string): string[][] {
   const rows: string[][] = [];
@@ -52,19 +94,13 @@ function parseCSV(s: string): string[][] {
   return rows;
 }
 
-let cache: { at: number; data: UpsideData } | null = null;
-const TTL_MS = 30_000;
-
-export async function getTdjpUpside(force = false): Promise<UpsideData> {
-  const empty: UpsideData = { year: config.tdjpUpsideYear, rows: emptyRows(), source: 'none' };
-  if (!config.tdjpUpsideCsvUrl) return empty;
-  if (!force && cache && Date.now() - cache.at < TTL_MS) return cache.data;
-
+async function seedFromSheet(year: number): Promise<Record<number, number[]> | null> {
+  // only the legacy forecast year was ever in the sheet
+  if (!config.tdjpUpsideCsvUrl || year !== config.tdjpUpsideYear) return null;
   try {
     const res = await fetch(config.tdjpUpsideCsvUrl);
     const txt = await res.text();
-    if (!res.ok || /<html/i.test(txt.slice(0, 200))) throw new Error('published CSV not available');
-
+    if (!res.ok || /<html/i.test(txt.slice(0, 200))) return null;
     const g = parseCSV(txt);
     let ti = -1;
     for (let i = 0; i < g.length; i++) {
@@ -73,28 +109,46 @@ export async function getTdjpUpside(force = false): Promise<UpsideData> {
         break;
       }
     }
-    if (ti < 0) throw new Error('TI row not found');
-
-    const B3_COL = 35; // column AJ (0-based) = start of block 3, 12 months
+    if (ti < 0) return null;
+    const B3_COL = 35; // column AJ (0-based) = start of block 3
     const num = (v: unknown) => {
       const n = Number(String(v ?? '').trim());
-      return isFinite(n) ? n : 0;
+      return isFinite(n) ? Math.round(n) : 0;
     };
     const seg = (r: number) => Array.from({ length: 12 }, (_, k) => num((g[r] || [])[B3_COL + k]));
-
-    // leaf rows are at fixed offsets from the TI row: TI, Service, Onshore,
-    // Germany(+3), Netherlands(+4), Offshore/R&D(+5), Hardware(+6), X1(+7), Others(+8)
-    const rows: Record<number, number[]> = {
+    return {
       12: seg(ti + 3),
       13: seg(ti + 4),
       14: seg(ti + 5),
       16: seg(ti + 7),
       17: seg(ti + 8),
     };
-    const data: UpsideData = { year: config.tdjpUpsideYear, rows, source: 'sheet' };
-    cache = { at: Date.now(), data };
-    return data;
   } catch {
-    return { year: config.tdjpUpsideYear, rows: emptyRows(), source: 'error' };
+    return null;
   }
+}
+
+// ---- public API ----
+
+export async function getTdjpUpside(year: number): Promise<UpsideData> {
+  const db = readDb(year);
+  if (db) return { year, rows: db.rows, updatedAt: db.updatedAt, source: 'db' };
+
+  const seeded = await seedFromSheet(year);
+  if (seeded) {
+    const updatedAt = new Date().toISOString();
+    setSetting(settingKey(year), JSON.stringify({ rows: seeded, updatedAt, seededFromSheet: true }));
+    await flushDb();
+    return { year, rows: seeded, updatedAt, source: 'seeded' };
+  }
+
+  return { year, rows: emptyRows(), updatedAt: null, source: 'none' };
+}
+
+export async function saveTdjpUpside(year: number, rows: unknown): Promise<UpsideData> {
+  const clean = sanitizeRows(rows);
+  const updatedAt = new Date().toISOString();
+  setSetting(settingKey(year), JSON.stringify({ rows: clean, updatedAt }));
+  await flushDb();
+  return { year, rows: clean, updatedAt, source: 'db' };
 }

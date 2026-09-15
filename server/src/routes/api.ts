@@ -30,7 +30,7 @@ import {
   setBudgetsForYear,
 } from '../db';
 import { isSyncing, runSync } from '../sync';
-import { getTdjpUpside } from '../tdjpUpside';
+import { getTdjpUpside, saveTdjpUpside } from '../tdjpUpside';
 
 export const api = Router();
 
@@ -74,10 +74,26 @@ api.post('/refresh', async (_req, res) => {
   res.json(result);
 });
 
-// TDJP block 3 (manual upside), read live from the published sheet CSV.
+// TDJP block 3 (manual upside), stored per year in our own database.
 api.get('/tdjp-upside', async (req, res) => {
-  const force = req.query.force === '1';
-  res.json(await getTdjpUpside(force));
+  const year = parseInt(String(req.query.year ?? config.tdjpUpsideYear), 10) || config.tdjpUpsideYear;
+  res.json(await getTdjpUpside(year));
+});
+
+// Save the manual upside for a year (edited from the TDJP tab). Whole k-EUR values.
+api.post('/tdjp-upside', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const year = parseInt(String(body.year), 10);
+    if (!year) {
+      res.status(400).json({ success: false, error: 'year is required' });
+      return;
+    }
+    const saved = await saveTdjpUpside(year, body.rows);
+    res.json({ success: true, ...saved });
+  } catch (e) {
+    res.status(500).json({ success: false, error: (e as Error).message });
+  }
 });
 
 // Budget (total per month: revenue + margin, in euros). Maintained by the user

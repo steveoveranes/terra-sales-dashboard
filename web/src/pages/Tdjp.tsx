@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Deal, getDeals, getTdjpUpside, TdjpUpside } from '../api';
+import { Deal, getDeals, getTdjpUpside, saveTdjpUpside, TdjpUpside } from '../api';
 
 // ---------------------------------------------------------------------------
 // TDJP Input Format — a faithful copy of the Google Sheet "TDJP Input Format"
@@ -118,6 +118,12 @@ export default function Tdjp({
   const [copied, setCopied] = useState<string>('');
   const [upside, setUpside] = useState<TdjpUpside | null>(null);
 
+  // upside editor (block 3) — values are whole k-EUR, always in EUR
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<Record<number, string[]>>({});
+  const [saving, setSaving] = useState(false);
+  const [saveErr, setSaveErr] = useState('');
+
   // EUR -> USD/JPY conversion (rate fetched live only while a currency is active).
   // 'eur' = no conversion; 'usd' and 'jpy' are mutually exclusive.
   type Cur = 'eur' | 'usd' | 'jpy';
@@ -189,10 +195,10 @@ export default function Tdjp({
     };
   }, [year, refreshKey]);
 
-  // fetch the manual upside (block 3) live from the published sheet CSV
+  // fetch the manual upside (block 3) for the selected year from our database
   useEffect(() => {
     let cancelled = false;
-    getTdjpUpside(refreshKey > 0)
+    getTdjpUpside(year)
       .then((u) => {
         if (!cancelled) setUpside(u);
       })
@@ -202,7 +208,7 @@ export default function Tdjp({
     return () => {
       cancelled = true;
     };
-  }, [refreshKey]);
+  }, [year, refreshKey]);
 
   // compute the five blocks (raw k EUR)
   const blocks = useMemo(() => {
@@ -279,6 +285,71 @@ export default function Tdjp({
     copyText([header.join('\t'), ...lines].join('\n'), 'full');
   }
 
+  // ---- upside editor (block 3) ----
+  const LEAF_ROWS = ROWS.filter((r) => r.leaf);
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  function fmtUpdated(iso: string | null): string {
+    if (!iso) return 'never';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return 'never';
+    return d.toLocaleString('nl-NL', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+
+  function openEditor() {
+    const d: Record<number, string[]> = {};
+    for (const r of LEAF_ROWS) {
+      const src = upside?.rows?.[String(r.key)] || [];
+      d[r.key] = Array.from({ length: 12 }, (_, m) => {
+        const v = Number(src[m]) || 0;
+        return v ? String(v) : '';
+      });
+    }
+    setDraft(d);
+    setSaveErr('');
+    setEditing(true);
+  }
+
+  // only allow whole integers (optional leading minus); strip everything else
+  function setDraftCell(rowKey: number, month: number, raw: string) {
+    const clean = raw.replace(/[^\d-]/g, '').replace(/(?!^)-/g, '');
+    setDraft((prev) => {
+      const next = { ...prev, [rowKey]: [...(prev[rowKey] || new Array(12).fill(''))] };
+      next[rowKey][month] = clean;
+      return next;
+    });
+  }
+
+  const draftRowTotal = (rowKey: number) =>
+    (draft[rowKey] || []).reduce((s, v) => s + (parseInt(v, 10) || 0), 0);
+  const draftMonthTotal = (month: number) =>
+    LEAF_ROWS.reduce((s, r) => s + (parseInt((draft[r.key] || [])[month], 10) || 0), 0);
+  const draftGrandTotal = () => LEAF_ROWS.reduce((s, r) => s + draftRowTotal(r.key), 0);
+
+  async function saveUpside() {
+    setSaving(true);
+    setSaveErr('');
+    try {
+      const rows: Record<number, number[]> = {};
+      for (const r of LEAF_ROWS) {
+        rows[r.key] = Array.from({ length: 12 }, (_, m) => parseInt((draft[r.key] || [])[m], 10) || 0);
+      }
+      const saved = await saveTdjpUpside(year, rows);
+      setUpside(saved);
+      setEditing(false);
+    } catch (e) {
+      setSaveErr((e as Error).message || 'Saving failed');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <div className="card">
       <div className="tdjp-bar">
@@ -302,6 +373,16 @@ export default function Tdjp({
           )}
         </div>
         <span className="spacer" />
+        <span className="tdjp-upside-updated" title="When the manual upside (block 3) was last edited">
+          Upside updated: {fmtUpdated(upside?.updatedAt ?? null)}
+        </span>
+        <button
+          className="btn btn-ghost"
+          onClick={openEditor}
+          title="Edit the manual upside numbers (block 3) for this year"
+        >
+          ✎ Edit upside
+        </button>
         {copied && <span className="copied-flag">Copied ✓</span>}
         <button className="btn" onClick={copyFull} title="Copy the whole grid (labels + all 5 blocks) as tab-separated values">
           Copy full grid
@@ -364,6 +445,76 @@ export default function Tdjp({
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {editing && (
+        <div className="up-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setEditing(false); }}>
+          <div className="up-modal" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="up-head">
+              <div>
+                <div className="up-title">Edit upside — Forecast (not a hard commit) · {year}</div>
+                <div className="up-sub">
+                  All amounts in <b>k EUR</b> (thousands), e.g. <b>50</b> = € 50.000. Whole numbers only.
+                  Always entered in <b>EUR</b>, regardless of the $USD / ¥JPY toggle.
+                </div>
+              </div>
+              <button className="up-x" onClick={() => setEditing(false)} aria-label="Close">×</button>
+            </div>
+
+            <div className="up-body">
+              <table className="up-grid">
+                <thead>
+                  <tr>
+                    <th className="up-rowhead">Category</th>
+                    {MONTHS.map((m) => (
+                      <th key={m} className="up-mhead">{m}</th>
+                    ))}
+                    <th className="up-total-head">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {LEAF_ROWS.map((r) => (
+                    <tr key={r.key}>
+                      <td className="up-rowlabel">{r.label}</td>
+                      {Array.from({ length: 12 }, (_, m) => (
+                        <td key={m} className="up-cell">
+                          <input
+                            className="up-input"
+                            type="text"
+                            inputMode="numeric"
+                            value={(draft[r.key] || [])[m] ?? ''}
+                            onChange={(e) => setDraftCell(r.key, m, e.target.value)}
+                            placeholder="0"
+                          />
+                        </td>
+                      ))}
+                      <td className="up-total">{draftRowTotal(r.key).toLocaleString('nl-NL')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td className="up-rowlabel up-foot">Total</td>
+                    {Array.from({ length: 12 }, (_, m) => (
+                      <td key={m} className="up-total up-foot">{draftMonthTotal(m).toLocaleString('nl-NL')}</td>
+                    ))}
+                    <td className="up-total up-foot">{draftGrandTotal().toLocaleString('nl-NL')}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            <div className="up-footer">
+              {saveErr && <span className="up-err">{saveErr}</span>}
+              <span className="up-hint">Saved to the database · replaces the old Google Sheet</span>
+              <span className="spacer" />
+              <button className="btn-ghost" onClick={() => setEditing(false)} disabled={saving}>Cancel</button>
+              <button className="btn" onClick={saveUpside} disabled={saving}>
+                {saving ? 'Saving…' : 'Save upside'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
