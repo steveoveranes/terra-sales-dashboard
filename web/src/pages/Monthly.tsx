@@ -27,6 +27,7 @@ function terraflowUrl(dealName: string): string {
 }
 
 const NO_MONTH = '__none__';
+const NO_OWNER = '(No owner)'; // bucket for deals without an assigned account manager
 
 // small localStorage helper (remembers the user's last filter choices)
 const LS = {
@@ -48,7 +49,17 @@ const LS = {
   },
 };
 
+// A deal is missing key data (always an attention point) when it has no account
+// manager (owner) or no gross-sales amount. Such rows are flagged red and counted
+// in the per-month attention total, regardless of stage.
+function missingData(d: Deal): boolean {
+  const noOwner = !d.owner || !d.owner.trim();
+  const noAmount = !d.deal_amount; // 0, null or undefined
+  return noOwner || noAmount;
+}
+
 // Row colour rule (relative to today's date):
+//  0. no owner OR no amount                              -> red (always, attention)
 //  1. stage "PO or Quote missing"                       -> red (always)
 //  2. stage "Paid"                                      -> dark green
 //  3. stage "Can be invoiced"                           -> light green,
@@ -56,6 +67,7 @@ const LS = {
 //  4. not on can-be-invoiced/invoiced/paid AND
 //        execution month before this month              -> red
 function rowClass(d: Deal, cur: string): string {
+  if (missingData(d)) return 'row-red';
   const stage = (d.deal_stage || '').trim().toLowerCase();
   const overdue = !!d.execution_month && d.execution_month < cur;
   if (stage === 'po or quote missing') return 'row-red';
@@ -165,7 +177,7 @@ export default function Monthly({
   }
 
   // last remembered partial selections (used when "All" is unchecked again)
-  const [ownersSub, setOwnersSub] = useState<string[]>(() => LS.get<string[]>('tsd.owners.subset') || []);
+  const [ownersSub, setOwnersSub] = useState<string[]>(() => LS.get<string[]>('tsd.owners.subset2') || []);
   const [pipesSub, setPipesSub] = useState<string[]>(() => LS.get<string[]>('tsd.pipelines.subset') || []);
 
   const cur = useMemo(currentMonth, []);
@@ -191,10 +203,14 @@ export default function Monthly({
   }, [year, refreshKey]);
 
   // distinct filter options, derived from the deals actually present
-  const ownerOptions = useMemo(
-    () => [...new Set(deals.map((d) => d.owner).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
-    [deals]
-  );
+  const ownerOptions = useMemo(() => {
+    const named = [...new Set(deals.map((d) => d.owner).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    // include a "(No owner)" bucket so deals without an account manager don't
+    // silently drop out of the overview (they'd otherwise match no filter option)
+    const hasNone = deals.some((d) => !d.owner || !d.owner.trim());
+    return hasNone ? [...named, NO_OWNER] : named;
+  }, [deals]);
+  const ownerKey = (d: Deal) => (d.owner && d.owner.trim() ? d.owner : NO_OWNER);
   const pipelineOptions = useMemo(
     () => [...new Set(deals.map((d) => d.sales_pipeline).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
     [deals]
@@ -225,7 +241,7 @@ export default function Monthly({
     if (!ownerOptions.length && !pipelineOptions.length && !stageOptions.length) return;
     const hidden = new Set((meta?.defaultHiddenStages || []).map((s) => s.trim().toLowerCase()));
 
-    const savedO = LS.get<string[]>('tsd.owners.current');
+    const savedO = LS.get<string[]>('tsd.owners.current2');
     const savedP = LS.get<string[]>('tsd.pipelines.current');
     const savedS = LS.get<string[]>('tsd.stages.current');
 
@@ -240,9 +256,9 @@ export default function Monthly({
   // persist current selections + remember partial subsets
   useEffect(() => {
     if (!ownerOptions.length) return;
-    LS.set('tsd.owners.current', owners.length ? owners : null);
+    LS.set('tsd.owners.current2', owners.length ? owners : null);
     if (owners.length > 0 && owners.length < ownerOptions.length) {
-      LS.set('tsd.owners.subset', owners);
+      LS.set('tsd.owners.subset2', owners);
       setOwnersSub(owners);
     }
   }, [owners, ownerOptions]);
@@ -273,7 +289,7 @@ export default function Monthly({
       return true;
     };
     return deals.filter((d) => {
-      if (!ownerSet.has(d.owner)) return false;
+      if (!ownerSet.has(ownerKey(d))) return false;
       if (!pipeSet.has(d.sales_pipeline)) return false;
       if (!stageKeySet.has((d.deal_stage || '').trim().toLowerCase())) return false;
       if (q && !(d.deal_name || '').toLowerCase().includes(q)) return false;
@@ -532,7 +548,7 @@ export default function Monthly({
       {legendOpen && (
         <div className="legend">
           <span className="legend-item">
-            <span className="sw sw-red" /> Overdue, or PO/Quote missing — needs action
+            <span className="sw sw-red" /> Overdue, PO/Quote missing, or no owner/amount — needs action
           </span>
           <span className="legend-item">
             <span className="sw sw-orange" /> Can be invoiced (execution month already passed)
@@ -727,7 +743,7 @@ function GroupBlock({
             </td>
             <td>{d.sales_pipeline}</td>
             <td>{d.deal_stage}</td>
-            <td>{d.owner}</td>
+            <td>{d.owner || <span className="subtle">(No owner)</span>}</td>
             <td className="num">{fmtInt(d.deal_amount)}</td>
             <td className="num">{fmtInt(d.cost_of_sales)}</td>
             <td className="num">{fmtInt(d.margin)}</td>

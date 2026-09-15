@@ -7,6 +7,14 @@ function fmtDate(s: string | null): string {
   return s.length >= 10 ? s.slice(0, 10) : s;
 }
 
+// TerraFlow deep link for a deal (same rule as the Monthly overview): highlight the
+// kanban card by its NN-NNNN(.N…) project code, else link to the kanban board.
+const TERRAFLOW_KANBAN = 'https://terra-flow.ai/kanban/';
+function terraflowUrl(dealName: string): string {
+  const m = (dealName || '').match(/\b\d{2}-\d{4}(?:\.\d+)*\b/);
+  return m ? `${TERRAFLOW_KANBAN}?highlight=${encodeURIComponent(m[0])}` : TERRAFLOW_KANBAN;
+}
+
 export default function RawData({ year, refreshKey }: { year: number; refreshKey: number }) {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,7 +97,19 @@ export default function RawData({ year, refreshKey }: { year: number; refreshKey
                 <tr key={d.id}>
                   <td>{fmtDate(d.execution_date)}</td>
                   <td>
-                    <a className="deal-link" href={d.deal_link} target="_blank" rel="noreferrer">
+                    <a
+                      className="hs-link"
+                      href={d.deal_link}
+                      target="_blank"
+                      rel="noreferrer"
+                      title="Open in HubSpot"
+                      aria-label="Open in HubSpot"
+                    >
+                      <svg viewBox="0 0 24 24" width="13" height="13" fill="#ff7a59" aria-hidden="true">
+                        <path d="M18.164 7.931V5.084a2.198 2.198 0 0 0 1.267-1.978v-.066A2.199 2.199 0 0 0 17.238.845h-.067a2.199 2.199 0 0 0-2.193 2.195v.066a2.198 2.198 0 0 0 1.252 1.973l.013.006v2.852a6.22 6.22 0 0 0-2.969 1.31l.012-.01-7.828-6.096A2.497 2.497 0 1 0 3.9 6.919l-.007-.005 7.702 5.984a6.235 6.235 0 0 0-1.048 3.474c0 1.315.407 2.535 1.103 3.541l-.014-.021-2.342 2.343a2.03 2.03 0 0 0-.585-.09h-.001a2.031 2.031 0 1 0 2.03 2.031c0-.209-.032-.411-.09-.601l.004.014 2.317-2.317a6.257 6.257 0 1 0 4.892-11.815l-.058-.02zm-1.056 9.402a3.21 3.21 0 1 1 .001-6.42 3.21 3.21 0 0 1-.001 6.42z" />
+                      </svg>
+                    </a>
+                    <a className="deal-link" href={terraflowUrl(d.deal_name)} target="_blank" rel="noreferrer" title="Open in TerraFlow">
                       {d.deal_name}
                     </a>
                   </td>
