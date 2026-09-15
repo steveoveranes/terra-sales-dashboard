@@ -367,9 +367,9 @@ export default function Monthly({
       'Sales pipeline',
       'Deal stage',
       'Owner',
-      'Deal amount',
+      'Gross sales',
       'Cost of sales',
-      'Margin',
+      'Nett sales',
       'Deal link',
     ];
     const lines = [header.join(sep)];
@@ -608,7 +608,7 @@ export default function Monthly({
                 </th>
                 <th className="num">
                   <ColumnHead
-                    label="Deal amount"
+                    label="Gross sales"
                     numeric
                     sortDir={sortDir('deal_amount')}
                     onCycleSort={() => cycleSort('deal_amount')}
@@ -628,7 +628,7 @@ export default function Monthly({
                 </th>
                 <th className="num">
                   <ColumnHead
-                    label="Margin"
+                    label="Nett sales"
                     numeric
                     sortDir={sortDir('margin')}
                     onCycleSort={() => cycleSort('margin')}

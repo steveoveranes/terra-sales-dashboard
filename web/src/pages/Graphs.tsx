@@ -3,7 +3,6 @@ import * as echarts from 'echarts';
 import { Deal, Meta, getDeals, getBudget, Budget, BudgetMonth, fmtInt, fmtCompact, fmtPct } from '../api';
 import MultiSelect from '../components/MultiSelect';
 import EChart, { EChartHandle } from '../components/EChart';
-import BudgetModal from '../components/BudgetModal';
 import { customerOf } from '../customerRules';
 
 /* ---------------- constants ---------------- */
@@ -646,7 +645,6 @@ export default function Graphs({
   const [budget, setBudget] = useState<Budget | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [budgetOpen, setBudgetOpen] = useState(false);
 
   // filters
   const [owners, setOwners] = useState<string[]>([]);
@@ -664,12 +662,12 @@ export default function Graphs({
   const [custCount, setCustCount] = useState<number>(() => LS.get<number>('tsd.g.custCount') || 30);
   const [yoyMetric, setYoyMetric] = useState<Metric>('revenue');
   const [yoyMode, setYoyMode] = useState<'monthly' | 'cumulative'>('monthly');
-  const [budgetMetric, setBudgetMetric] = useState<'sales' | 'margin'>(() => (LS.get<'sales' | 'margin'>('tsd.g.budgetMetric')) || 'sales');
-  const [budgetMode, setBudgetMode] = useState<'month' | 'cumulative'>(() => (LS.get<'month' | 'cumulative'>('tsd.g.budgetMode')) || 'month');
+  const [budgetMetric, setBudgetMetric] = useState<'sales' | 'margin'>(() => (LS.get<'sales' | 'margin'>('tsd.g.budgetMetric2')) || 'margin');
+  const [budgetMode, setBudgetMode] = useState<'month' | 'cumulative'>(() => (LS.get<'month' | 'cumulative'>('tsd.g.budgetMode2')) || 'cumulative');
   const [budgetType, setBudgetType] = useState<BudgetChartType>(() => (LS.get<BudgetChartType>('tsd.g.budgetType')) || 'group');
   const budgetChartRef = useRef<EChartHandle>(null);
-  useEffect(() => { LS.set('tsd.g.budgetMetric', budgetMetric); }, [budgetMetric]);
-  useEffect(() => { LS.set('tsd.g.budgetMode', budgetMode); }, [budgetMode]);
+  useEffect(() => { LS.set('tsd.g.budgetMetric2', budgetMetric); }, [budgetMetric]);
+  useEffect(() => { LS.set('tsd.g.budgetMode2', budgetMode); }, [budgetMode]);
   useEffect(() => { LS.set('tsd.g.budgetType', budgetType); }, [budgetType]);
 
   // period (month) filter: 'full' year, or a month index 0..11 meaning "through that month"
@@ -966,7 +964,7 @@ export default function Graphs({
       budgetArr = cumulate(budgetArr);
     }
     const actualColor = isSales ? BLUE : AQUA;
-    const actualName = (isSales ? 'Sales' : 'Margin') + (budgetMode === 'cumulative' ? ' (cum.)' : ' (actual)');
+    const actualName = (isSales ? 'Gross sales' : 'Nett sales') + (budgetMode === 'cumulative' ? ' (cum.)' : ' (actual)');
     const series = buildBudgetSeries(budgetType, actual, budgetArr, actualColor, actualName, hasBudget);
     return {
       tooltip: { trigger: 'axis', axisPointer: { type: budgetType === 'group' || budgetType === 'barline' ? 'shadow' : 'line', shadowStyle: { color: 'rgba(20,56,147,0.06)' } }, valueFormatter: (v: number) => fmtInt(v) },
@@ -987,7 +985,7 @@ export default function Graphs({
     const actualCum = cum(revByMonth.slice(0, monthsCount));
     const series: any[] = [
       {
-        name: 'Revenue cumulative',
+        name: 'Gross sales cumulative',
         type: 'line',
         data: actualCum,
         smooth: true,
@@ -1162,9 +1160,9 @@ export default function Graphs({
   if (loading && !allDeals.length) return <div className="empty">Loading charts…</div>;
 
   const metricOpts: { key: Metric; label: string }[] = [
-    { key: 'revenue', label: 'Revenue' },
-    { key: 'margin', label: 'Margin' },
-    { key: 'marginpct', label: 'Margin %' },
+    { key: 'revenue', label: 'Gross' },
+    { key: 'margin', label: 'Nett' },
+    { key: 'marginpct', label: 'Nett %' },
   ];
 
   // month-limited series for the sparklines (through the selected period)
@@ -1183,7 +1181,7 @@ export default function Graphs({
       {/* KPI ROW */}
       <div className="kpi-row">
         <Kpi
-          label={`Sales forecast ${periodLabel}`}
+          label={`Gross sales forecast ${periodLabel}`}
           value={fmtInt(revThis)}
           delta={pctDelta(revThis, revPrev)}
           sub={`vs ${year - 1}`}
@@ -1194,7 +1192,7 @@ export default function Graphs({
           noteColor={revToMeet > 0 ? AMBER : GREEN}
         />
         <Kpi
-          label={`Margin forecast ${periodLabel}`}
+          label={`Nett sales forecast ${periodLabel}`}
           value={fmtInt(marThis)}
           delta={pctDelta(marThis, marPrev)}
           sub={`vs ${year - 1}`}
@@ -1204,11 +1202,11 @@ export default function Graphs({
           note={hasBudget ? toMeetNote(marToMeet) : undefined}
           noteColor={marToMeet > 0 ? AMBER : GREEN}
         />
-        <Kpi label="Margin %" value={isFinite(marPctThis) ? fmtPct(marPctThis) : '–'} delta={isFinite(marPctThis) && isFinite(marPctPrev) ? marPctThis - marPctPrev : null} sub={`vs ${year - 1}`} spark={marPctSpark} sparkColor={CAT[6]} />
+        <Kpi label="Nett sales %" value={isFinite(marPctThis) ? fmtPct(marPctThis) : '–'} delta={isFinite(marPctThis) && isFinite(marPctPrev) ? marPctThis - marPctPrev : null} sub={`vs ${year - 1}`} spark={marPctSpark} sparkColor={CAT[6]} />
         <Kpi label="Deals" value={String(nThis)} delta={pctDelta(nThis, nPrev)} sub={`vs ${year - 1}`} spark={countSpark} sparkColor={CAT[2]} />
         <Kpi label="Avg. deal size" value={fmtInt(avgThis)} delta={pctDelta(avgThis, avgPrev)} sub={`vs ${year - 1}`} spark={avgSpark} sparkColor={CAT[3]} />
         <Kpi
-          label="Sales vs budget"
+          label="Gross sales vs budget"
           value={hasBudget ? fmtPct(revVsBudget) : '–'}
           sub={hasBudget ? `${fmtCompact(revThis)} / ${fmtCompact(budgetRevYear)}` : 'no budget'}
           delta={hasBudget ? revVsBudget - 100 : null}
@@ -1242,9 +1240,6 @@ export default function Graphs({
           </button>
         )}
         <span className="spacer" />
-        <button className="btn" onClick={() => setBudgetOpen(true)}>
-          Edit budget
-        </button>
       </div>
 
       {/* CHART GRID */}
@@ -1253,7 +1248,7 @@ export default function Graphs({
         <div className="gcard wide">
           <div className="gcard-head">
             <div>
-              <h3>{budgetMetric === 'sales' ? 'Sales' : 'Margin'} vs budget per month</h3>
+              <h3>{budgetMetric === 'sales' ? 'Gross sales' : 'Nett sales'} vs budget per month</h3>
               <span className="gcard-hint">
                 {filtersActive ? 'Note: filters active — budget is at company level' : 'Actual vs budget — are we hitting budget?'}
               </span>
@@ -1261,7 +1256,7 @@ export default function Graphs({
             <div className="gcard-controls">
               <Seg
                 value={budgetMetric}
-                options={[{ key: 'sales', label: 'Sales' }, { key: 'margin', label: 'Margin' }]}
+                options={[{ key: 'sales', label: 'Gross' }, { key: 'margin', label: 'Nett' }]}
                 onChange={setBudgetMetric}
               />
               <Seg
@@ -1270,11 +1265,6 @@ export default function Graphs({
                 onChange={setBudgetMode}
               />
               <ChartTypeMenu value={budgetType} onChange={setBudgetType} />
-              {!hasBudget && (
-                <button className="btn-ghost" onClick={() => setBudgetOpen(true)}>
-                  Add budget
-                </button>
-              )}
               <button className="icon-btn" title="Download as image" aria-label="Download as image" onClick={() => budgetChartRef.current?.download('sales-margin-vs-budget')}>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 3v12" />
@@ -1290,7 +1280,7 @@ export default function Graphs({
             </div>
             <div className="budget-tables">
               <BudgetVsActualTable
-                title={`${budgetMetric === 'sales' ? 'Sales' : 'Margin'}${budgetMode === 'cumulative' ? ' — cumulative' : ' — per month'}`}
+                title={`${budgetMetric === 'sales' ? 'Gross sales' : 'Nett sales'}${budgetMode === 'cumulative' ? ' — cumulative' : ' — per month'}`}
                 actual={budgetMetric === 'sales' ? revByMonth : marByMonth}
                 budget={budgetMetric === 'sales' ? budgetRevMonth : budgetMarMonth}
                 n={monthsCount}
@@ -1302,7 +1292,7 @@ export default function Graphs({
         </div>
 
         <ChartBlock
-          title="Cumulative revenue vs budget"
+          title="Cumulative gross sales vs budget"
           hint="Pacing — are we ahead or behind"
           downloadName="pacing"
           height={320}
@@ -1310,8 +1300,8 @@ export default function Graphs({
         />
 
         <ChartBlock
-          title="Revenue by category"
-          hint="Revenue distribution"
+          title="Gross sales by category"
+          hint="Gross sales distribution"
           downloadName="revenue-by-category"
           height={320}
           option={pipelineOption}
@@ -1320,8 +1310,8 @@ export default function Graphs({
         />
 
         <ChartBlock
-          title="Revenue by deal stage"
-          hint="Where the revenue sits in the funnel"
+          title="Gross sales by deal stage"
+          hint="Where the gross sales sit in the funnel"
           downloadName="revenue-by-deal-stage"
           height={barHeight(stageData.length)}
           option={stageOption}
@@ -1329,7 +1319,7 @@ export default function Graphs({
         />
 
         <ChartBlock
-          title="Margin % by pipeline"
+          title="Nett sales % by pipeline"
           hint="Profitability by pipeline"
           downloadName="margin-pct-by-pipeline"
           height={barHeight(marginPctRows.length)}
@@ -1338,7 +1328,7 @@ export default function Graphs({
         />
 
         <ChartBlock
-          title="Sales per account manager"
+          title="Gross sales per account manager"
           hint="Sorted by the chosen metric"
           wide
           downloadName="account-manager-performance"
@@ -1349,7 +1339,7 @@ export default function Graphs({
         />
 
         <ChartBlock
-          title="Customers — revenue"
+          title="Customers — gross sales"
           hint={`${custDir === 'top' ? 'Top' : 'Bottom'} ${Math.min(custCount, totalCustomers)} of ${totalCustomers} customers`}
           wide
           downloadName="customers-revenue"
@@ -1365,7 +1355,7 @@ export default function Graphs({
         />
 
         <ChartBlock
-          title="Customers — margin"
+          title="Customers — nett sales"
           hint={`${custDir === 'top' ? 'Top' : 'Bottom'} ${Math.min(custCount, totalCustomers)} of ${totalCustomers} customers`}
           wide
           downloadName="customers-margin"
@@ -1389,20 +1379,12 @@ export default function Graphs({
           option={yoyOption}
           controls={
             <>
-              <Seg value={yoyMetric} options={[{ key: 'revenue', label: 'Revenue' }, { key: 'margin', label: 'Margin' }]} onChange={setYoyMetric} />
+              <Seg value={yoyMetric} options={[{ key: 'revenue', label: 'Gross' }, { key: 'margin', label: 'Nett' }]} onChange={setYoyMetric} />
               <Seg value={yoyMode} options={[{ key: 'monthly', label: 'Monthly' }, { key: 'cumulative', label: 'Cumulative' }]} onChange={setYoyMode} />
             </>
           }
         />
       </div>
-
-      {budgetOpen && (
-        <BudgetModal
-          year={year}
-          onClose={() => setBudgetOpen(false)}
-          onSaved={() => getBudget(year).then(setBudget).catch(() => {})}
-        />
-      )}
     </div>
   );
 }

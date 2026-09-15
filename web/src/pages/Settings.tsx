@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AppSetting, MailStatus, getSettings, runFollowupSweep, saveSettings, sendTestEmail } from '../api';
+import BudgetModal from '../components/BudgetModal';
 
 // Application settings screen. Edits operational/business settings that are safe to
 // change at runtime (they persist in the settings store, layered over env defaults).
 // Secrets (SMTP password, HubSpot token, DATABASE_URL) are intentionally NOT here —
 // they stay in .env and are shown only as a read-only status.
 
-export default function Settings({ refreshKey }: { refreshKey: number }) {
+export default function Settings({ refreshKey, year }: { refreshKey: number; year: number }) {
   const [defs, setDefs] = useState<AppSetting[]>([]);
   const [values, setValues] = useState<Record<string, string>>({});
   const [mail, setMail] = useState<MailStatus | null>(null);
@@ -20,6 +21,7 @@ export default function Settings({ refreshKey }: { refreshKey: number }) {
   const [testMsg, setTestMsg] = useState('');
   const [testOk, setTestOk] = useState<boolean | null>(null);
   const [testing, setTesting] = useState(false);
+  const [budgetOpen, setBudgetOpen] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -165,33 +167,12 @@ export default function Settings({ refreshKey }: { refreshKey: number }) {
       <div className="set-scroll">
         <div className="set-inner">
           <h1 className="set-h1">Application settings</h1>
-          <p className="set-lead">
-            Operational settings you can change without a redeploy. Secrets (SMTP password, HubSpot
-            token, database URL) live in the server's <code>.env</code> and are not editable here.
-          </p>
 
           {error && <div className="set-error">{error}</div>}
           {loading && <div className="idea-empty">Loading…</div>}
 
           {!loading && (
             <>
-              {/* mail transport status */}
-              {mail && (
-                <div className={'set-mail ' + (mail.configured ? 'ok' : 'warn')}>
-                  <div className="set-mail-dot" />
-                  <div>
-                    <div className="set-mail-title">
-                      E-mail transport: {mail.configured ? 'configured' : 'not configured'}
-                    </div>
-                    <div className="set-mail-sub">
-                      SMTP host <code>{mail.host}</code> · account <code>{mail.user}</code>
-                      {!mail.configured && (
-                        <> — set <code>SMTP_USER</code> and <code>SMTP_PASS</code> (Gmail app-password) in <code>.env</code> to actually send mail. Until then the follow-up loop logs to the server console instead of sending.</>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {Object.entries(groups).map(([group, list]) => {
                 const basic = list.filter((d) => !d.advanced);
@@ -228,6 +209,18 @@ export default function Settings({ refreshKey }: { refreshKey: number }) {
                 </button>
               )}
 
+              {/* budget editor (moved here from the Graphs tab) */}
+              <div className="set-group">
+                <h2 className="set-h2">Budget</h2>
+                <p className="set-help">
+                  Set the monthly gross- and nett-sales budget for {year}. It's used on the Graphs tab
+                  (actual vs. budget). Editing here keeps the Graphs view uncluttered.
+                </p>
+                <button className="btn" onClick={() => setBudgetOpen(true)}>
+                  ✎ Edit budget for {year}
+                </button>
+              </div>
+
               {/* test the follow-up loop */}
               <div className="set-group">
                 <h2 className="set-h2">Test the follow-up loop</h2>
@@ -248,6 +241,24 @@ export default function Settings({ refreshKey }: { refreshKey: number }) {
                 )}
                 {sweepMsg && <div className="set-sweep-msg">{sweepMsg}</div>}
               </div>
+
+              {/* mail transport status (kept at the bottom as a status banner) */}
+              {mail && (
+                <div className={'set-mail ' + (mail.configured ? 'ok' : 'warn')}>
+                  <div className="set-mail-dot" />
+                  <div>
+                    <div className="set-mail-title">
+                      E-mail transport: {mail.configured ? 'configured' : 'not configured'}
+                    </div>
+                    <div className="set-mail-sub">
+                      SMTP host <code>{mail.host}</code> · account <code>{mail.user}</code>
+                      {!mail.configured && (
+                        <> — set <code>SMTP_USER</code> and <code>SMTP_PASS</code> (Gmail app-password) in <code>.env</code> to actually send mail. Until then the follow-up loop logs to the server console instead of sending.</>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -259,11 +270,14 @@ export default function Settings({ refreshKey }: { refreshKey: number }) {
           {savedMsg && <span className="set-saved">{savedMsg}</span>}
           {dirty && !savedMsg && <span className="set-dirty">Unsaved changes</span>}
           <span className="idea-spacer" />
-          <button className="btn-ghost" onClick={load} disabled={saving}>Reset</button>
           <button className="btn" onClick={save} disabled={saving || !dirty}>
             {saving ? 'Saving…' : 'Save changes'}
           </button>
         </div>
+      )}
+
+      {budgetOpen && (
+        <BudgetModal year={year} onClose={() => setBudgetOpen(false)} onSaved={() => setBudgetOpen(false)} />
       )}
     </div>
   );

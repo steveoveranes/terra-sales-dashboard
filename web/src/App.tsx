@@ -136,7 +136,7 @@ export default function App() {
         {tab === 'graphs' && <Graphs year={year} refreshKey={refreshKey} meta={meta} />}
         {tab === 'tdjp' && <Tdjp year={year} refreshKey={refreshKey} defaultCurrency={meta?.defaultCurrency} />}
         {tab === 'ideas' && <Ideas refreshKey={refreshKey} />}
-        {tab === 'settings' && <Settings refreshKey={refreshKey} />}
+        {tab === 'settings' && <Settings refreshKey={refreshKey} year={year} />}
       </div>
 
       <FeedbackBubble />

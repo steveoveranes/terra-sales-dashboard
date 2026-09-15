@@ -90,8 +90,8 @@ export default function BudgetModal({
               <thead>
                 <tr>
                   <th>Month</th>
-                  <th className="num">Revenue budget (€)</th>
-                  <th className="num">Margin budget (€)</th>
+                  <th className="num">Gross sales budget (€)</th>
+                  <th className="num">Nett sales budget (€)</th>
                 </tr>
               </thead>
               <tbody>

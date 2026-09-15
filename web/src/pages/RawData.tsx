@@ -77,9 +77,9 @@ export default function RawData({ year, refreshKey }: { year: number; refreshKey
                 <th>Sales pipeline</th>
                 <th>Deal stage</th>
                 <th>Owner</th>
-                <th className="num">Deal amount</th>
+                <th className="num">Gross sales</th>
                 <th className="num">Cost of sales</th>
-                <th className="num">Margin</th>
+                <th className="num">Nett sales</th>
                 <th>Month</th>
                 <th>Deal ID</th>
               </tr>
