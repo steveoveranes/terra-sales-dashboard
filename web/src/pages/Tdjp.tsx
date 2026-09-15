@@ -41,6 +41,10 @@ const ROWS: RowDef[] = [
   { key: 17, label: 'Others', indent: 2, leaf: true, pipe: 'ut drone hardware sales' },
 ];
 
+// Rows that get the "total" tint: the subtotals TI, Service, Onshore, Hardware.
+// Germany, Netherlands, Offshore/R&D, X1, Others stay the plain colour.
+const TOTAL_KEYS = new Set([9, 10, 11, 15]);
+
 // subtotal parent -> children, evaluated in this order (children first)
 const SUB_ORDER: [number, number[]][] = [
   [11, [12, 13]],
@@ -259,13 +263,6 @@ export default function Tdjp({
     }
   }
 
-  // one block as TSV: 9 rows (TI..Others) x 12 months, whole numbers
-  function copyBlock(blockId: number) {
-    const g = blocks[blockId];
-    const tsv = ROWS.map((r) => g[r.key].map((v) => Math.round(conv(v))).join('\t')).join('\n');
-    copyText(tsv, `block-${blockId}`);
-  }
-
   // the full grid incl. row labels + all 5 blocks (blocks separated by one empty column)
   function copyFull() {
     const lines = ROWS.map((r) => {
@@ -399,21 +396,18 @@ export default function Tdjp({
       {!loading && !error && (
         <div className="table-wrap tdjp-wrap">
           <table className="grid tdjp">
+            <colgroup>
+              <col className="tdjp-col-label" />
+              {Array.from({ length: 60 }, (_, i) => (
+                <col key={i} />
+              ))}
+            </colgroup>
             <thead>
               <tr>
                 <th className="tdjp-cat sticky-col">Revenue Input Sheet</th>
                 {BLOCKS.map((b) => (
                   <th key={b.id} className="tdjp-block-head" colSpan={12}>
-                    <div className="tdjp-block-head-row">
-                      <span>{b.title}</span>
-                      <button
-                        className="ghost-btn tdjp-copy"
-                        onClick={() => copyBlock(b.id)}
-                        title="Copy this block (9 rows × 12 months) as tab-separated values"
-                      >
-                        Copy
-                      </button>
-                    </div>
+                    {b.title}
                   </th>
                 ))}
               </tr>
@@ -430,8 +424,8 @@ export default function Tdjp({
             </thead>
             <tbody>
               {ROWS.map((r) => (
-                <tr key={r.key} className={r.leaf ? 'tdjp-leaf' : 'tdjp-sub'}>
-                  <td className="tdjp-cat sticky-col" style={{ paddingLeft: 10 + r.indent * 16 }}>
+                <tr key={r.key} className={TOTAL_KEYS.has(r.key) ? 'tdjp-total' : 'tdjp-plain'}>
+                  <td className="tdjp-cat sticky-col" style={{ paddingLeft: 6 + r.indent * 10 }}>
                     {r.label}
                   </td>
                   {BLOCKS.map((b) =>
@@ -455,30 +449,30 @@ export default function Tdjp({
               <div>
                 <div className="up-title">Edit upside — Forecast (not a hard commit) · {year}</div>
                 <div className="up-sub">
-                  All amounts in <b>k EUR</b> (thousands), e.g. <b>50</b> = € 50.000. Whole numbers only.
-                  Always entered in <b>EUR</b>, regardless of the $USD / ¥JPY toggle.
+                  Whole numbers in <b>k EUR</b> (50 = € 50.000) · always <b>EUR</b>, regardless of the $USD / ¥JPY toggle.
                 </div>
               </div>
               <button className="up-x" onClick={() => setEditing(false)} aria-label="Close">×</button>
             </div>
 
             <div className="up-body">
+              {/* Months down, categories across — compact so the whole grid fits the width. */}
               <table className="up-grid">
                 <thead>
                   <tr>
-                    <th className="up-rowhead">Category</th>
-                    {MONTHS.map((m) => (
-                      <th key={m} className="up-mhead">{m}</th>
+                    <th className="up-rowhead">Month</th>
+                    {LEAF_ROWS.map((r) => (
+                      <th key={r.key} className="up-mhead">{r.label}</th>
                     ))}
                     <th className="up-total-head">Total</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {LEAF_ROWS.map((r) => (
-                    <tr key={r.key}>
-                      <td className="up-rowlabel">{r.label}</td>
-                      {Array.from({ length: 12 }, (_, m) => (
-                        <td key={m} className="up-cell">
+                  {MONTHS.map((mLabel, m) => (
+                    <tr key={m}>
+                      <td className="up-rowlabel">{mLabel}</td>
+                      {LEAF_ROWS.map((r) => (
+                        <td key={r.key} className="up-cell">
                           <input
                             className="up-input"
                             type="text"
@@ -489,15 +483,15 @@ export default function Tdjp({
                           />
                         </td>
                       ))}
-                      <td className="up-total">{draftRowTotal(r.key).toLocaleString('nl-NL')}</td>
+                      <td className="up-total">{draftMonthTotal(m).toLocaleString('nl-NL')}</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
                   <tr>
                     <td className="up-rowlabel up-foot">Total</td>
-                    {Array.from({ length: 12 }, (_, m) => (
-                      <td key={m} className="up-total up-foot">{draftMonthTotal(m).toLocaleString('nl-NL')}</td>
+                    {LEAF_ROWS.map((r) => (
+                      <td key={r.key} className="up-total up-foot">{draftRowTotal(r.key).toLocaleString('nl-NL')}</td>
                     ))}
                     <td className="up-total up-foot">{draftGrandTotal().toLocaleString('nl-NL')}</td>
                   </tr>
@@ -507,7 +501,6 @@ export default function Tdjp({
 
             <div className="up-footer">
               {saveErr && <span className="up-err">{saveErr}</span>}
-              <span className="up-hint">Saved to the database · replaces the old Google Sheet</span>
               <span className="spacer" />
               <button className="btn-ghost" onClick={() => setEditing(false)} disabled={saving}>Cancel</button>
               <button className="btn" onClick={saveUpside} disabled={saving}>

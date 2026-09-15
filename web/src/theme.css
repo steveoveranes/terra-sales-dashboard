@@ -901,18 +901,46 @@ table.grid tbody td {
   overflow-x: auto;
 }
 table.grid.tdjp {
-  table-layout: auto;
-  width: auto;
-  min-width: 100%;
+  table-layout: fixed; /* forces the grid to fit its container — cannot overflow */
+  width: 100%;
+  min-width: 0;
+  font-size: 9.5px; /* compact: this grid is for copy-paste, not for reading */
+}
+.tdjp-col-label { width: 112px; }
+/* tight cells so all 5 blocks × 12 months fit the page width without scrolling */
+table.grid.tdjp thead th,
+table.grid.tdjp tbody td {
+  padding: 1px 2px;
 }
 table.grid.tdjp th,
 table.grid.tdjp td {
   border-right: 1px solid var(--line);
 }
-.tdjp-cat {
+/* value + month cells: never wrap, clip if too tight */
+table.grid.tdjp td.tdjp-val,
+table.grid.tdjp th.tdjp-month {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+  min-width: 0;
+}
+/* category labels: single line always (override the base grid's wrap rule) */
+table.grid.tdjp td.tdjp-cat,
+table.grid.tdjp th.tdjp-cat {
   text-align: left;
   white-space: nowrap;
-  min-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 10px;
+  min-width: 0;
+}
+/* block titles stay on one line (never wrap) */
+table.grid.tdjp th.tdjp-block-head {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 9.5px;
+  text-align: center;
 }
 /* frozen first column */
 .sticky-col {
@@ -950,29 +978,29 @@ table.grid.tdjp thead .sticky-col {
   border-color: #fff;
 }
 .tdjp-month {
-  min-width: 46px;
+  min-width: 24px;
   font-weight: 700;
 }
 .tdjp-val {
-  min-width: 46px;
+  min-width: 24px;
 }
 .tdjp .block-start {
   border-left: 2px solid var(--twilight);
 }
-/* leaf category rows (from HubSpot) get the sheet's yellow tint on their values */
-.tdjp-leaf .tdjp-val {
-  background: #fffbe0;
+/* all data rows share one background; only the "total" rows get a tint.
+   numbers are never bold (keeps them narrow enough to fit). */
+.tdjp-val,
+.tdjp-month {
+  font-weight: 400;
 }
-.tdjp-leaf:hover .tdjp-val {
-  background: #fff6c4;
+.tdjp-plain td {
+  background: transparent;
 }
-/* subtotal rows are bold */
-.tdjp-sub td {
-  font-weight: 800;
-  background: #f4f7ff;
+.tdjp-total td {
+  background: #eaf1ff;
 }
-.tdjp-sub .sticky-col {
-  background: #f4f7ff;
+.tdjp-total .sticky-col {
+  background: #eaf1ff;
 }
 
 .tdjp-bar-left {
@@ -1633,13 +1661,14 @@ table.grid tbody tr.group-header.current td:first-child {
 .tdjp-title { color: #fff; }
 /* frozen category column on data rows */
 .sticky-col { background: #12203f; box-shadow: 1px 0 0 rgba(255, 255, 255, 0.08); }
-/* leaf rows: keep the sheet's amber accent but readable (light text on dark amber) */
-.tdjp-leaf .tdjp-val { background: rgba(255, 196, 61, 0.16); }
-.tdjp-leaf:hover .tdjp-val { background: rgba(255, 196, 61, 0.26); }
-.tdjp-leaf .sticky-col { background: #17233f; }
-/* subtotal rows */
-.tdjp-sub td { background: rgba(255, 255, 255, 0.06); color: #fff; }
-.tdjp-sub .sticky-col { background: #1c2a50; }
+/* all rows one colour; only the "total" rows (TI, Service, Onshore, Offshore/R&D,
+   Hardware) get a subtle tint. Numbers stay non-bold. */
+/* higher specificity than the zebra rule (table.grid tbody tr:nth-child(even) td)
+   so the TDJP grid has ONE row colour, with only the total rows tinted */
+table.grid.tdjp tbody tr.tdjp-plain td { background: transparent; color: #fff; }
+table.grid.tdjp tbody tr.tdjp-plain .sticky-col { background: #12203f; }
+table.grid.tdjp tbody tr.tdjp-total td { background: rgba(37, 161, 244, 0.15); color: #fff; }
+table.grid.tdjp tbody tr.tdjp-total .sticky-col { background: #16294d; }
 .copied-flag { color: #37d39a; }
 
 /* KPI "to meet budget" note line */
@@ -2095,47 +2124,40 @@ table.grid tbody tr.group-header.current td:first-child {
 .tdjp-upside-updated { font-size: 11px; color: var(--muted); margin-right: 4px; white-space: nowrap; }
 
 .up-overlay {
-  position: fixed; inset: 0; background: rgba(15, 15, 86, 0.45);
+  position: fixed; inset: 0; background: rgba(10, 10, 40, 0.62);
   display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px;
 }
+/* The dashboard is a single (dark) theme, so the modal is styled dark-native. */
 .up-modal {
-  background: var(--card); border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,.3);
-  width: min(1100px, 96vw); max-height: 90vh; display: flex; flex-direction: column; overflow: hidden;
+  background: #171a3d; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,.55);
+  width: min(1000px, 96vw); max-height: 92vh; display: flex; flex-direction: column; overflow: hidden;
 }
-.up-head { display: flex; align-items: flex-start; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--line); }
-.up-title { font-weight: 800; font-size: 16px; color: var(--night); }
-.up-sub { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.5; max-width: 760px; }
-.up-x { margin-left: auto; background: none; border: none; font-size: 24px; line-height: 1; color: var(--muted); cursor: pointer; padding: 0 4px; }
-.up-x:hover { color: var(--ink); }
+.up-head { display: flex; align-items: flex-start; gap: 12px; padding: 16px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+.up-title { font-weight: 800; font-size: 16px; color: #ffffff; }
+.up-sub { font-size: 12px; color: #aeb8d8; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.up-x { margin-left: auto; background: none; border: none; font-size: 24px; line-height: 1; color: #aeb8d8; cursor: pointer; padding: 0 4px; }
+.up-x:hover { color: #fff; }
 
 .up-body { padding: 12px 20px; overflow: auto; }
 .up-grid { border-collapse: collapse; font-size: 13px; }
-.up-grid th, .up-grid td { border: 1px solid var(--line); }
+.up-grid th, .up-grid td { border: 1px solid rgba(255,255,255,0.1); }
 .up-rowhead, .up-mhead, .up-total-head {
   background: var(--night); color: #fff; font-weight: 700; padding: 6px 8px; position: sticky; top: 0;
   text-align: center; white-space: nowrap;
 }
 .up-rowhead { text-align: left; left: 0; z-index: 2; }
 .up-mhead { min-width: 52px; }
-.up-rowlabel { font-weight: 700; padding: 4px 10px; white-space: nowrap; position: sticky; left: 0; background: var(--card); z-index: 1; }
-.up-cell { padding: 2px; }
+.up-rowlabel { font-weight: 800; font-size: 13px; color: #eef2fb; padding: 2px 12px; white-space: nowrap; position: sticky; left: 0; background: #171a3d; z-index: 1; }
+.up-cell { padding: 1px; }
 .up-input {
-  width: 56px; border: 1px solid transparent; border-radius: 6px; padding: 5px 6px; font: inherit;
-  font-size: 13px; text-align: right; font-variant-numeric: tabular-nums; background: #f6f7fb;
+  width: 100%; min-width: 84px; border: 1px solid transparent; border-radius: 6px; padding: 3px 8px; font: inherit;
+  font-size: 13px; text-align: right; font-variant-numeric: tabular-nums; background: #24244d; color: #fff;
 }
-.up-input:focus { outline: none; border-color: var(--dusk); background: #fff; }
+.up-input:focus { outline: none; border-color: var(--fineday); background: #2c2c58; }
 .up-total, .up-total-head { text-align: right; font-variant-numeric: tabular-nums; padding: 4px 10px; white-space: nowrap; }
-.up-total { color: var(--muted); background: #fafbff; }
-.up-foot { font-weight: 800; color: var(--ink); background: #eef2fb; }
+.up-total { color: #aeb8d8; background: #1b1b3d; }
+.up-foot { font-weight: 800; color: #fff; background: #21214a; }
 
-.up-footer { display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-top: 1px solid var(--line); }
-.up-hint { font-size: 12px; color: var(--muted); }
-.up-err { font-size: 13px; color: var(--status-red); font-weight: 700; }
-
-@media (prefers-color-scheme: dark) {
-  .up-input { background: #17173a; color: #e7e8f5; }
-  .up-input:focus { background: #1f1f45; }
-  .up-rowlabel { background: var(--card); }
-  .up-total { background: #14143080; }
-  .up-foot { background: #1b1b3d; }
-}
+.up-footer { display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-top: 1px solid rgba(255,255,255,0.1); }
+.up-hint { font-size: 12px; color: #aeb8d8; }
+.up-err { font-size: 13px; color: #ff8f8f; font-weight: 700; }
