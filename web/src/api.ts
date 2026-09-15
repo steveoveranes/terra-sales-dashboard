@@ -164,6 +164,15 @@ export const sendTestEmail = (to?: string) =>
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(to ? { to } : {}),
   });
+export const announceVersion = (build: string, whatsNew: string) =>
+  j<{ success: boolean; mode: string; recipients: number; sent: number; errors: string[] }>(
+    '/api/announce-version',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ build, whatsNew }),
+    }
+  );
 export const getSettings = () => j<{ settings: AppSetting[]; mail: MailStatus }>('/api/settings');
 export const saveSettings = (settings: Record<string, string | boolean | number>) =>
   j<{ success: boolean; changed: string[]; settings: AppSetting[]; mail: MailStatus }>('/api/settings', {

@@ -17,8 +17,10 @@ import {
   owner as ownerCfg,
   sync as syncCfg,
   display as displayCfg,
+  followup as followupCfg,
+  notify as notifyCfg,
 } from '../appSettings';
-import { sendMail } from '../mailer';
+import { esc, mailConfigured, sendMail } from '../mailer';
 import {
   BudgetMonth,
   flushDb,
@@ -256,6 +258,75 @@ api.post('/mail-test', async (req, res) => {
         'kan de opvolg-loop reminders en updates versturen.\n\n— Terra Sales Dashboard',
     });
     res.json({ success: r.ok, mode: r.mode, error: r.error || null, to });
+  } catch (e) {
+    res.status(500).json({ success: false, error: (e as Error).message });
+  }
+});
+
+// Announce a new dashboard version to the configured recipient list (manual button
+// on the Settings screen). Sends one e-mail per recipient so colleagues don't see
+// each other's addresses. The "what's new" text is optional free text typed per release.
+api.post('/announce-version', async (req, res) => {
+  try {
+    const b = req.body || {};
+    const build = String(b.build || '').trim();
+    const whatsNew = String(b.whatsNew || '').trim();
+    const recipients = notifyCfg.recipients();
+    if (!recipients.length) {
+      res.status(400).json({
+        success: false,
+        error: 'No recipients configured. Add addresses to "New-version recipients" and save first.',
+      });
+      return;
+    }
+
+    const appUrl = followupCfg.appBaseUrl();
+    const buildTxt = build ? ` (build ${build})` : '';
+    const subject = `🚀 Nieuwe versie — Terra Sales Dashboard${buildTxt}`;
+    // one change per line; strip any leading number ("1.", "2)") or bullet ("-", "•", "*")
+    // the user typed, then re-number the list ourselves so it always runs 1, 2, 3…
+    const bullets = whatsNew
+      ? whatsNew
+          .split(/\n+/)
+          .map((l) => l.replace(/^\s*(?:\d+[.)]|[-•*])\s*/, '').trim())
+          .filter(Boolean)
+      : [];
+
+    const text =
+      `Er is een nieuwe versie van het Terra Sales Dashboard${buildTxt}.\n\n` +
+      (bullets.length ? 'Wat is er nieuw:\n' + bullets.map((l, i) => `${i + 1}. ${l}`).join('\n') + '\n\n' : '') +
+      (appUrl
+        ? `Open het dashboard (herlaad de pagina voor de nieuwste versie):\n${appUrl}\n\n`
+        : 'Herlaad de pagina (Ctrl+F5) voor de nieuwste versie.\n\n') +
+      '— Terra Sales Dashboard';
+
+    const html =
+      `<div style="font-family:Segoe UI,Arial,sans-serif;color:#1a1a2e">` +
+      `<p>Er is een nieuwe versie van het <b>Terra Sales Dashboard</b>${buildTxt ? esc(buildTxt) : ''}.</p>` +
+      (bullets.length
+        ? `<p><b>Wat is er nieuw:</b></p><ol>${bullets.map((l) => `<li>${esc(l)}</li>`).join('')}</ol>`
+        : '') +
+      (appUrl
+        ? `<p><a href="${esc(appUrl)}" style="background:#143893;color:#fff;padding:9px 16px;border-radius:8px;text-decoration:none;display:inline-block">Open het dashboard →</a></p>` +
+          `<p style="color:#6b7280;font-size:12px">Tip: herlaad de pagina (Ctrl+F5) om de nieuwste versie te laden.</p>`
+        : `<p style="color:#6b7280;font-size:12px">Herlaad de pagina (Ctrl+F5) om de nieuwste versie te laden.</p>`) +
+      `<p style="color:#6b7280;font-size:12px">— Terra Sales Dashboard</p></div>`;
+
+    let sent = 0;
+    const errors: string[] = [];
+    for (const to of recipients) {
+      const r = await sendMail({ to, subject, text, html });
+      if (r.ok) sent++;
+      else errors.push(`${to}: ${r.error || 'failed'}`);
+    }
+
+    res.json({
+      success: errors.length === 0,
+      mode: mailConfigured() ? 'sent' : 'console',
+      recipients: recipients.length,
+      sent,
+      errors,
+    });
   } catch (e) {
     res.status(500).json({ success: false, error: (e as Error).message });
   }

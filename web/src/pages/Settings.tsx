@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AppSetting, MailStatus, getSettings, runFollowupSweep, saveSettings, sendTestEmail } from '../api';
+import { AppSetting, MailStatus, announceVersion, getSettings, runFollowupSweep, saveSettings, sendTestEmail } from '../api';
 import BudgetModal from '../components/BudgetModal';
+import { BUILD_NUMBER } from '../buildInfo';
+import { WHATS_NEW_DEFAULT } from '../whatsNew';
 
 // Application settings screen. Edits operational/business settings that are safe to
 // change at runtime (they persist in the settings store, layered over env defaults).
@@ -22,6 +24,10 @@ export default function Settings({ refreshKey, year }: { refreshKey: number; yea
   const [testOk, setTestOk] = useState<boolean | null>(null);
   const [testing, setTesting] = useState(false);
   const [budgetOpen, setBudgetOpen] = useState(false);
+  const [whatsNew, setWhatsNew] = useState(WHATS_NEW_DEFAULT);
+  const [announcing, setAnnouncing] = useState(false);
+  const [announceMsg, setAnnounceMsg] = useState('');
+  const [announceOk, setAnnounceOk] = useState<boolean | null>(null);
 
   async function load() {
     setLoading(true);
@@ -116,6 +122,36 @@ export default function Settings({ refreshKey, year }: { refreshKey: number; yea
       setTestMsg('Sending failed: ' + (e as Error).message);
     } finally {
       setTesting(false);
+    }
+  }
+
+  // currently SAVED recipients (server announces to the saved value, not the unsaved input)
+  const savedRecipients = defs.find((d) => d.key === 'notify.new_version_recipients')?.value ?? '';
+  const recipientsDirty =
+    (values['notify.new_version_recipients'] ?? '') !== savedRecipients;
+  const recipientCount = savedRecipients.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean).length;
+
+  async function announce() {
+    setAnnouncing(true);
+    setAnnounceMsg('');
+    setAnnounceOk(null);
+    try {
+      const r = await announceVersion(BUILD_NUMBER, whatsNew);
+      setAnnounceOk(r.success);
+      if (r.mode === 'console') {
+        setAnnounceMsg(
+          `No SMTP configured — nothing actually sent (would have gone to ${r.recipients} recipient${r.recipients === 1 ? '' : 's'}). Set SMTP_USER/SMTP_PASS in .env.`
+        );
+      } else if (r.success) {
+        setAnnounceMsg(`Announcement sent to ${r.sent} of ${r.recipients} recipient${r.recipients === 1 ? '' : 's'}.`);
+      } else {
+        setAnnounceMsg(`Sent to ${r.sent} of ${r.recipients}; some failed: ${r.errors.join('; ')}`);
+      }
+    } catch (e) {
+      setAnnounceOk(false);
+      setAnnounceMsg('Announcement failed: ' + (e as Error).message);
+    } finally {
+      setAnnouncing(false);
     }
   }
 
@@ -240,6 +276,55 @@ export default function Settings({ refreshKey, year }: { refreshKey: number; yea
                   <div className={'set-sweep-msg' + (testOk === false ? ' err' : testOk ? ' ok' : '')}>{testMsg}</div>
                 )}
                 {sweepMsg && <div className="set-sweep-msg">{sweepMsg}</div>}
+              </div>
+
+              {/* announce a new version to the team by e-mail */}
+              <div className="set-group">
+                <h2 className="set-h2">Announce a new version</h2>
+                <p className="set-help">
+                  Sends a "new version available" e-mail to the recipients set above under{' '}
+                  <b>Notifications → New-version recipients</b>. Currently{' '}
+                  {recipientCount} recipient{recipientCount === 1 ? '' : 's'} saved. Type a short
+                  what's-new note (one line per bullet), then press Announce. Current build:{' '}
+                  <code>{BUILD_NUMBER}</code>.
+                </p>
+                {recipientsDirty && (
+                  <div className="set-sweep-msg err">
+                    You changed the recipient list but haven't saved yet — press “Save changes” first,
+                    otherwise the announcement uses the previously saved recipients.
+                  </div>
+                )}
+                <textarea
+                  className="set-input"
+                  style={{ width: '100%', minHeight: 96, resize: 'vertical', fontFamily: 'inherit' }}
+                  placeholder={"What's new in this version? One numbered line per point, e.g.\n1. Deals without owner or amount are now flagged red\n2. Raw HubSpot data links open in TerraFlow"}
+                  value={whatsNew}
+                  onChange={(e) => setWhatsNew(e.target.value)}
+                />
+                <div className="set-btn-row" style={{ marginTop: 10 }}>
+                  <button
+                    className="btn"
+                    onClick={announce}
+                    disabled={announcing || recipientCount === 0}
+                    title={recipientCount === 0 ? 'Add and save at least one recipient first' : 'Send the announcement now'}
+                  >
+                    {announcing ? 'Sending…' : '🚀 Announce new version'}
+                  </button>
+                  {whatsNew !== WHATS_NEW_DEFAULT && (
+                    <button
+                      className="btn-ghost"
+                      onClick={() => setWhatsNew(WHATS_NEW_DEFAULT)}
+                      title="Restore the pre-filled list of changes"
+                    >
+                      ↺ Reset text
+                    </button>
+                  )}
+                </div>
+                {announceMsg && (
+                  <div className={'set-sweep-msg' + (announceOk === false ? ' err' : announceOk ? ' ok' : '')}>
+                    {announceMsg}
+                  </div>
+                )}
               </div>
 
               {/* mail transport status (kept at the bottom as a status banner) */}

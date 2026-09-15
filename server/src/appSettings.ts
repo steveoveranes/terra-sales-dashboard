@@ -171,6 +171,18 @@ export const SETTING_DEFS: SettingDef[] = [
     ],
     help: 'Currency the TDJP Input Format tab shows by default.',
   },
+
+  // --- Notifications ---
+  {
+    key: 'notify.new_version_recipients',
+    label: 'New-version recipients',
+    group: 'Notifications',
+    type: 'string',
+    default: config.ownerEmail,
+    help:
+      'Who receives the "new version available" e-mail when you press Announce below. ' +
+      'Comma-separated addresses. Save first, then use the Announce button.',
+  },
 ];
 
 const BY_KEY: Record<string, SettingDef> = Object.fromEntries(SETTING_DEFS.map((d) => [d.key, d]));
@@ -223,6 +235,15 @@ export const sync = {
 export const display = {
   defaultTab: () => settingStr('display.default_tab'),
   defaultCurrency: () => settingStr('display.default_currency'),
+};
+
+export const notify = {
+  // Parsed recipient list for the "new version" announcement (comma/semicolon/newline separated).
+  recipients: () =>
+    settingStr('notify.new_version_recipients')
+      .split(/[,;\n]+/)
+      .map((s) => s.trim())
+      .filter(Boolean),
 };
 
 /** Years to sync, honouring the editable start-year setting (and any env override).
