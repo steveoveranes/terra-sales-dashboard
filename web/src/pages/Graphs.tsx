@@ -976,46 +976,6 @@ export default function Graphs({
     };
   }, [revByMonth, marByMonth, budgetRevMonth, budgetMarMonth, hasBudget, budgetMetric, budgetMode, budgetType, monthsCount]);
 
-  // cumulative pacing
-  const pacingOption = useMemo(() => {
-    const cum = (arr: number[]) => {
-      let t = 0;
-      return arr.map((v) => (t += v));
-    };
-    const actualCum = cum(revByMonth.slice(0, monthsCount));
-    const series: any[] = [
-      {
-        name: 'Gross sales cumulative',
-        type: 'line',
-        data: actualCum,
-        smooth: true,
-        symbol: 'circle',
-        symbolSize: 6,
-        lineStyle: { width: 3, color: BLUE },
-        itemStyle: { color: BLUE },
-        areaStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: 'rgba(42,120,214,0.28)' },
-            { offset: 1, color: 'rgba(42,120,214,0.02)' },
-          ]),
-        },
-        z: 5,
-      },
-    ];
-    if (hasBudget) {
-      const budgetCum = cum(budgetRevMonth.slice(0, monthsCount));
-      series.push({ name: 'Budget cumulative', type: 'line', data: budgetCum, smooth: true, symbol: 'none', lineStyle: { width: 2, color: GRAY, type: 'dashed' }, itemStyle: { color: GRAY } });
-    }
-    return {
-      tooltip: { trigger: 'axis', valueFormatter: (v: number) => fmtInt(v) },
-      legend: { bottom: 0, textStyle: { color: INK }, icon: 'roundRect' },
-      grid: baseGrid({ bottom: 56 }),
-      xAxis: { type: 'category', data: MONTHS.slice(0, monthsCount), boundaryGap: false, ...AXIS },
-      yAxis: { type: 'value', ...AXIS, axisLine: { show: false }, ...SPLIT, axisLabel: { color: MUTED, formatter: (v: number) => fmtCompact(v) } },
-      series,
-    };
-  }, [revByMonth, budgetRevMonth, hasBudget, monthsCount]);
-
   // account managers
   const pickMetric = (metric: Metric) => (d: Deal) => (metric === 'margin' ? d.margin : d.deal_amount);
   const amRows = useMemo(() => {
@@ -1290,14 +1250,6 @@ export default function Graphs({
             </div>
           </div>
         </div>
-
-        <ChartBlock
-          title="Cumulative gross sales vs budget"
-          hint="Pacing — are we ahead or behind"
-          downloadName="pacing"
-          height={320}
-          option={pacingOption}
-        />
 
         <ChartBlock
           title="Gross sales by category"
