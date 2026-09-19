@@ -43,9 +43,14 @@ export default function MultiSelect({
       </button>
       {open && (
         <div className="ms-panel">
-          <label className="ms-opt ms-all">
-            <input type="checkbox" checked={allSelected} onChange={toggleAll} /> All
-          </label>
+          <div className="ms-allrow">
+            <label className="ms-opt ms-all">
+              <input type="checkbox" checked={allSelected} onChange={toggleAll} /> All
+            </label>
+            <button type="button" className="ms-none-btn" onClick={() => onChange([])} title="Deselect everything">
+              None
+            </button>
+          </div>
           <div className="ms-divider" />
           <div className="ms-scroll">
             {options.map((opt) => (

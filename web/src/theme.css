@@ -475,20 +475,6 @@ table.grid tr.group-header.current td:first-child {
   gap: 4px;
   cursor: pointer;
 }
-.cl-none-btn {
-  border: none;
-  background: none;
-  padding: 0;
-  margin-left: 6px;
-  cursor: pointer;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--muted);
-}
-.cl-none-btn:hover {
-  text-decoration: underline;
-  color: var(--ink);
-}
 /* floating panel that never shifts the other filters */
 .cl-panel {
   position: absolute;
@@ -650,6 +636,30 @@ table.grid tr.group-header.current td:first-child {
 }
 .ms-all {
   font-weight: 700;
+}
+.ms-allrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ms-allrow .ms-all {
+  flex: 1;
+}
+.ms-none-btn {
+  border: none;
+  background: none;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  border-radius: 5px;
+  white-space: nowrap;
+}
+.ms-none-btn:hover {
+  background: var(--daytime);
+  color: var(--ink);
 }
 .ms-divider {
   height: 1px;

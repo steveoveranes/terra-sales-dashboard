@@ -58,17 +58,6 @@ export default function CheckList({
         <label className="cl-all">
           <input type="checkbox" checked={allSelected} onChange={toggleAll} /> All
         </label>
-        <button
-          type="button"
-          className="cl-none-btn"
-          onClick={() => {
-            onChange([]);
-            setOpen(true);
-          }}
-          title="Deselect everything"
-        >
-          None
-        </button>
         {!allSelected && !open && <span className="cl-selcount">{selected.length}</span>}
       </div>
       {showPanel && (
