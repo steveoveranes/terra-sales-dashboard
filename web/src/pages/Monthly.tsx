@@ -58,6 +58,18 @@ function missingData(d: Deal): boolean {
   return noOwner || noAmount;
 }
 
+// Stages that are "committed or further in the process" — i.e. revenue that is
+// already secured. Anything NOT in this set still needs to be won.
+const SECURED_STAGES = new Set([
+  'committed',
+  'operations briefed',
+  'closed won',
+  'project finished',
+  'can be invoiced',
+  'invoiced',
+  'paid',
+]);
+
 // Row colour rule (relative to today's date):
 //  0. no owner OR no amount                              -> red (always, attention)
 //  1. stage "PO or Quote missing"                       -> red (always)
@@ -66,6 +78,8 @@ function missingData(d: Deal): boolean {
 //        but orange if execution month is before this month
 //  4. not on can-be-invoiced/invoiced/paid AND
 //        execution month before this month              -> red
+//  5. this month or later, not red, and NOT yet secured
+//        (still to be won)                              -> orange
 function rowClass(d: Deal, cur: string): string {
   if (missingData(d)) return 'row-red';
   const stage = (d.deal_stage || '').trim().toLowerCase();
@@ -75,6 +89,8 @@ function rowClass(d: Deal, cur: string): string {
   if (stage === 'can be invoiced') return overdue ? 'row-orange' : 'row-lightgreen';
   const settled = stage === 'can be invoiced' || stage === 'invoiced' || stage === 'paid';
   if (!settled && overdue) return 'row-red';
+  // current month or later, still to be won (not committed/won/further) -> orange
+  if (d.execution_month && d.execution_month >= cur && !SECURED_STAGES.has(stage)) return 'row-orange';
   return '';
 }
 
@@ -551,7 +567,7 @@ export default function Monthly({
             <span className="sw sw-red" /> Overdue, PO/Quote missing, or no owner/amount — needs action
           </span>
           <span className="legend-item">
-            <span className="sw sw-orange" /> Can be invoiced (execution month already passed)
+            <span className="sw sw-orange" /> Still to be won (this month or later, not yet committed) — or overdue "can be invoiced"
           </span>
           <span className="legend-item">
             <span className="sw sw-lightgreen" /> Can be invoiced

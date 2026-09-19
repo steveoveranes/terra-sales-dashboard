@@ -8,12 +8,13 @@ import Graphs from './pages/Graphs';
 import Ideas from './pages/Ideas';
 import Settings from './pages/Settings';
 import FeedbackBubble from './components/FeedbackBubble';
+import LocationReviewModal from './components/LocationReviewModal';
 
 type Tab = 'monthly' | 'graphs' | 'tdjp' | 'raw' | 'ideas' | 'settings';
 
 const TABS: { key: Tab; label: string }[] = [
+  { key: 'graphs', label: 'Dashboard' },
   { key: 'monthly', label: 'Monthly overview' },
-  { key: 'graphs', label: 'Graphs' },
   { key: 'tdjp', label: 'TDJP Input Format' },
   { key: 'raw', label: 'Raw HubSpot data' },
   { key: 'ideas', label: 'Ideas & feedback' },
@@ -43,6 +44,7 @@ export default function App() {
   const [sync, setSync] = useState<SyncStatus | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [showLocReview, setShowLocReview] = useState(false);
   const defaultTabApplied = useRef(false);
 
   async function loadMeta() {
@@ -79,6 +81,8 @@ export default function App() {
       await loadMeta();
       await loadSync();
       setRefreshKey((k) => k + 1);
+      setShowLocReview(true); // review any deals that couldn't be placed on the map
+
     } catch (e) {
       console.error(e);
       alert('Refresh failed: ' + (e as Error).message);
@@ -140,6 +144,18 @@ export default function App() {
       </div>
 
       <FeedbackBubble />
+
+      {showLocReview && meta && (
+        <LocationReviewModal
+          year={year}
+          rules={meta.countryRules}
+          onClose={() => setShowLocReview(false)}
+          onSaved={() => {
+            loadMeta().catch((e) => console.error(e));
+            setRefreshKey((k) => k + 1);
+          }}
+        />
+      )}
     </div>
   );
 }

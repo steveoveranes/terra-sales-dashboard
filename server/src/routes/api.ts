@@ -33,8 +33,22 @@ import {
 } from '../db';
 import { isSyncing, runSync } from '../sync';
 import { getTdjpUpside, saveTdjpUpside } from '../tdjpUpside';
+import { getCountryRules, addUserCountryRules } from '../countryRules';
 
 export const api = Router();
+
+// Append user-added location rules (from the "assign location" modal shown after a
+// refresh). Body: { nameRules?, provinceRules?, stateRules? }. Stored separately from the
+// code defaults so version bumps never wipe them (see countryRules.ts).
+api.post('/country-rules/user', (req, res) => {
+  const b = (req.body || {}) as any;
+  const rules = addUserCountryRules({
+    nameRules: Array.isArray(b.nameRules) ? b.nameRules : [],
+    provinceRules: Array.isArray(b.provinceRules) ? b.provinceRules : [],
+    stateRules: Array.isArray(b.stateRules) ? b.stateRules : [],
+  });
+  res.json({ success: true, countryRules: rules });
+});
 
 api.get('/deals', (req, res) => {
   const fallback = new Date().getFullYear();
@@ -56,6 +70,7 @@ api.get('/meta', (_req, res) => {
     defaultHiddenStages: syncCfg.excludedStages(),
     defaultTab: displayCfg.defaultTab(),
     defaultCurrency: displayCfg.defaultCurrency(),
+    countryRules: getCountryRules(),
     useMock: config.useMock,
     portalId: config.hubspotPortalId,
   });

@@ -29,6 +29,7 @@ export interface Meta {
   defaultHiddenStages: string[];
   defaultTab?: string;
   defaultCurrency?: string;
+  countryRules?: import('./countryRules').CountryRules;
   useMock: boolean;
   portalId: string;
 }
@@ -179,6 +180,17 @@ export const saveSettings = (settings: Record<string, string | boolean | number>
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ settings }),
+  });
+
+export const addUserCountryRules = (rules: {
+  nameRules?: { contains: string; country: string }[];
+  provinceRules?: { contains: string; province: string }[];
+  stateRules?: { contains: string; state: string }[];
+}) =>
+  j<{ success: boolean; countryRules: import('./countryRules').CountryRules }>('/api/country-rules/user', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(rules),
   });
 
 export const getMeta = () => j<Meta>('/api/meta');

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 // Inline checkbox filter. "All" checked = compact (panel hidden). Uncheck "All"
 // to open a floating panel and pick specific values; a small × hides the panel
@@ -22,11 +22,6 @@ export default function CheckList({
   const [open, setOpen] = useState(false);
   const allSelected = options.length > 0 && selected.length === options.length;
 
-  // when everything is selected again, collapse the panel
-  useEffect(() => {
-    if (allSelected) setOpen(false);
-  }, [allSelected]);
-
   function toggle(opt: string) {
     if (selected.includes(opt)) onChange(selected.filter((o) => o !== opt));
     else onChange([...selected, opt]);
@@ -43,7 +38,9 @@ export default function CheckList({
     }
   }
 
-  const showPanel = open && !allSelected;
+  // The panel stays open as long as `open` is true — even when everything is
+  // selected — so the all/none quick buttons don't close it under the user.
+  const showPanel = open;
 
   return (
     <div className="cl">
@@ -61,11 +58,31 @@ export default function CheckList({
         <label className="cl-all">
           <input type="checkbox" checked={allSelected} onChange={toggleAll} /> All
         </label>
+        <button
+          type="button"
+          className="cl-none-btn"
+          onClick={() => {
+            onChange([]);
+            setOpen(true);
+          }}
+          title="Deselect everything"
+        >
+          None
+        </button>
         {!allSelected && !open && <span className="cl-selcount">{selected.length}</span>}
       </div>
       {showPanel && (
         <div className="cl-panel">
           <div className="cl-panel-head">
+            <div className="cl-bulk">
+              <button type="button" className="cl-bulk-btn" onClick={() => onChange([...options])} title="Select all">
+                all
+              </button>
+              <span className="cl-bulk-sep">·</span>
+              <button type="button" className="cl-bulk-btn" onClick={() => onChange([])} title="Select none">
+                none
+              </button>
+            </div>
             <button type="button" className="cl-close" onClick={() => setOpen(false)} title="Hide" aria-label="Hide">
               ×
             </button>

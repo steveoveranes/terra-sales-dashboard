@@ -12,7 +12,7 @@ export interface EChartHandle {
  * Exposes a `download` method (via ref) so a PNG button can live in the card header
  * instead of overlapping the chart.
  */
-const EChart = forwardRef<EChartHandle, { option: any; height?: number; onEvents?: Record<string, (p: any) => void> }>(
+const EChart = forwardRef<EChartHandle, { option: any; height?: number | string; onEvents?: Record<string, (p: any) => void> }>(
   function EChart({ option, height = 320, onEvents }, ref) {
     const elRef = useRef<HTMLDivElement>(null);
     const chartRef = useRef<echarts.ECharts | null>(null);

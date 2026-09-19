@@ -3,6 +3,7 @@ import * as echarts from 'echarts';
 import { Deal, Meta, getDeals, getBudget, Budget, BudgetMonth, fmtInt, fmtCompact, fmtPct } from '../api';
 import MultiSelect from '../components/MultiSelect';
 import EChart, { EChartHandle } from '../components/EChart';
+import SalesMap from '../components/SalesMap';
 import { customerOf } from '../customerRules';
 
 /* ---------------- constants ---------------- */
@@ -660,6 +661,7 @@ export default function Graphs({
   const [amMetric, setAmMetric] = useState<Metric>('revenue');
   const [custDir, setCustDir] = useState<'top' | 'bottom'>('top');
   const [custCount, setCustCount] = useState<number>(() => LS.get<number>('tsd.g.custCount') || 30);
+  const [custMetric, setCustMetric] = useState<'revenue' | 'margin'>(() => (LS.get<'revenue' | 'margin'>('tsd.g.custMetric')) || 'revenue');
   const [yoyMetric, setYoyMetric] = useState<Metric>('revenue');
   const [yoyMode, setYoyMode] = useState<'monthly' | 'cumulative'>('monthly');
   const [budgetMetric, setBudgetMetric] = useState<'sales' | 'margin'>(() => (LS.get<'sales' | 'margin'>('tsd.g.budgetMetric2')) || 'margin');
@@ -688,6 +690,16 @@ export default function Graphs({
     () => (meta?.dataYears?.length ? meta.dataYears : [year]),
     [meta?.dataYears, year]
   );
+
+  // Years shown in the Year-over-year chart: always the current calendar year and
+  // the two years before it — never future years. Only keep years we actually have
+  // data loaded for, so we don't draw empty lines.
+  const yoyYears = useMemo(() => {
+    const cy = new Date().getFullYear();
+    const have = new Set(years);
+    const wanted = [cy - 2, cy - 1, cy].filter((y) => have.has(y));
+    return wanted.length ? wanted : years.filter((y) => y <= cy).slice(-3);
+  }, [years]);
 
   // load deals for every year that has data (for YoY + last-year deltas)
   useEffect(() => {
@@ -777,6 +789,9 @@ export default function Graphs({
   useEffect(() => {
     LS.set('tsd.g.custCount', custCount);
   }, [custCount]);
+  useEffect(() => {
+    LS.set('tsd.g.custMetric', custMetric);
+  }, [custMetric]);
 
   const filt = { owners, pipelines, stages, search };
   // when "Include no exec date" is off, deals without an execution date are excluded everywhere
@@ -1046,30 +1061,90 @@ export default function Graphs({
     });
   };
 
-  // margin % per pipeline
+  // margin % per pipeline (bar = margin %, plus total gross/nett per pipeline)
   const marginPctRows = useMemo(() => {
     const rev = groupSum(fThis, (d) => d.sales_pipeline || 'Unknown', (d) => d.deal_amount);
     const mar = groupSum(fThis, (d) => d.sales_pipeline || 'Unknown', (d) => d.margin);
     return [...rev.keys()]
-      .map((name) => ({ name, value: rev.get(name) ? ((mar.get(name) || 0) / (rev.get(name) || 1)) * 100 : 0 }))
+      .map((name) => {
+        const g = rev.get(name) || 0;
+        const n = mar.get(name) || 0;
+        return { name, value: g ? (n / g) * 100 : 0, gross: g, nett: n };
+      })
       .sort((a, b) => a.value - b.value);
   }, [fThis]);
-  const marginPctOption = useMemo(
-    () =>
-      horizontalBars({
-        rows: marginPctRows,
-        color: (name) => pipeColor(name),
-        valueFmt: (v) => fmtPct(v),
-        axisFmt: (v) => v + '%',
-        labelWidth: 130,
-      }),
-    [marginPctRows, pipeColor]
-  );
+  // Custom chart: horizontal margin-% bars, with a small "total gross / total nett"
+  // caption inside each bar. A second, transparent bar carries the inside label so
+  // we can keep the % value at the end of the bar.
+  const marginPctOption = useMemo(() => {
+    const rows = marginPctRows;
+    return {
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'shadow', shadowStyle: { color: 'rgba(20,56,147,0.06)' } },
+        formatter: (ps: any) => {
+          const i = ps[0].dataIndex;
+          const r = rows[i];
+          return `${r.name}<br/>Margin: ${fmtPct(r.value)}<br/>Total gross: ${fmtInt(r.gross)}<br/>Total nett: ${fmtInt(r.nett)}`;
+        },
+      },
+      grid: { left: 8, right: 64, top: 12, bottom: 12, containLabel: true },
+      xAxis: { type: 'value', ...AXIS, axisLine: { show: false }, ...SPLIT, axisLabel: { color: MUTED, formatter: (v: number) => v + '%' } },
+      yAxis: {
+        type: 'category',
+        data: rows.map((r) => r.name),
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: { color: INK, interval: 0, width: 130, overflow: 'truncate', fontSize: 12 },
+      },
+      series: [
+        {
+          type: 'bar',
+          data: rows.map((r) => ({ value: r.value, itemStyle: { color: grad(pipeColor(r.name)), borderRadius: [4, 6, 6, 4] } })),
+          barWidth: 18,
+          showBackground: true,
+          backgroundStyle: TRACK,
+          label: { show: true, position: 'right', distance: 6, formatter: (p: any) => fmtPct(p.value), color: INK, fontSize: 11, fontWeight: 600 },
+          z: 1,
+          animationDuration: 700,
+        },
+        {
+          // transparent overlay bar, only to render the inside gross/nett caption.
+          // The caption shrinks to fit the bar: full → abbreviated (grs:/net:, no
+          // space after €) → amounts only, based on how long the bar (margin %) is.
+          type: 'bar',
+          data: rows.map((r) => r.value),
+          barWidth: 18,
+          barGap: '-100%',
+          itemStyle: { color: 'transparent' },
+          silent: true,
+          label: {
+            show: true,
+            position: 'insideLeft',
+            distance: 8,
+            align: 'left',
+            formatter: (p: any) => {
+              const r = rows[p.dataIndex];
+              const g = fmtCompact(r.gross).replace('€ ', '€'); // no space after €
+              const n = fmtCompact(r.nett).replace('€ ', '€');
+              const v = r.value; // margin %, proxy for bar length
+              if (v >= 50) return `total gross: ${g} - total nett: ${n}`;
+              if (v >= 28) return `grs: ${g} net: ${n}`;
+              return `${g} · ${n}`;
+            },
+            color: '#0c1836',
+            fontSize: 9,
+          },
+          z: 2,
+        },
+      ],
+    };
+  }, [marginPctRows, pipeColor]);
 
   // year over year
   const yoyOption = useMemo(() => {
     const pick = pickMetric(yoyMetric === 'margin' ? 'margin' : 'revenue');
-    const series = years.map((y, i) => {
+    const series = yoyYears.map((y, i) => {
       const ds = applyFilters(byYear[y] || [], filt).filter(passExec);
       const arr = new Array(12).fill(0);
       for (const d of ds) {
@@ -1098,7 +1173,7 @@ export default function Graphs({
       yAxis: { type: 'value', ...AXIS, axisLine: { show: false }, ...SPLIT, axisLabel: { color: MUTED, formatter: (v: number) => fmtCompact(v) } },
       series,
     };
-  }, [byYear, years.join(','), owners, pipelines, stages, search, yoyMetric, yoyMode, year, monthsCount, includeNoExec]);
+  }, [byYear, yoyYears.join(','), owners, pipelines, stages, search, yoyMetric, yoyMode, year, monthsCount, includeNoExec]);
 
   /* ---------- filters bar ---------- */
 
@@ -1271,18 +1346,17 @@ export default function Graphs({
         />
 
         <ChartBlock
-          title="Nett sales % by pipeline"
+          title="Margin by pipeline"
           hint="Profitability by pipeline"
-          downloadName="margin-pct-by-pipeline"
+          downloadName="margin-by-pipeline"
           height={barHeight(marginPctRows.length)}
           option={marginPctOption}
           empty={!marginPctRows.length}
         />
 
         <ChartBlock
-          title="Gross sales per account manager"
+          title="Sales per account manager"
           hint="Sorted by the chosen metric"
-          wide
           downloadName="account-manager-performance"
           height={barHeight(amRows.length)}
           option={amOption}
@@ -1290,32 +1364,23 @@ export default function Graphs({
           controls={<Seg value={amMetric} options={metricOpts} onChange={setAmMetric} />}
         />
 
-        <ChartBlock
-          title="Customers — gross sales"
-          hint={`${custDir === 'top' ? 'Top' : 'Bottom'} ${Math.min(custCount, totalCustomers)} of ${totalCustomers} customers`}
-          wide
-          downloadName="customers-revenue"
-          height={barHeight(customerRows('revenue').length)}
-          option={customerOption('revenue')}
-          empty={!fThis.length}
-          controls={
-            <>
-              <Seg value={custDir} options={[{ key: 'top', label: 'Largest' }, { key: 'bottom', label: 'Smallest' }]} onChange={setCustDir} />
-              {CountSelect}
-            </>
-          }
-        />
+        <SalesMap deals={fThis} rules={meta?.countryRules} />
 
         <ChartBlock
-          title="Customers — nett sales"
+          title="Sales per customer"
           hint={`${custDir === 'top' ? 'Top' : 'Bottom'} ${Math.min(custCount, totalCustomers)} of ${totalCustomers} customers`}
           wide
-          downloadName="customers-margin"
-          height={barHeight(customerRows('margin').length)}
-          option={customerOption('margin')}
+          downloadName="sales-per-customer"
+          height={barHeight(customerRows(custMetric).length)}
+          option={customerOption(custMetric)}
           empty={!fThis.length}
           controls={
             <>
+              <Seg
+                value={custMetric}
+                options={[{ key: 'revenue', label: 'Gross' }, { key: 'margin', label: 'Nett' }]}
+                onChange={setCustMetric}
+              />
               <Seg value={custDir} options={[{ key: 'top', label: 'Largest' }, { key: 'bottom', label: 'Smallest' }]} onChange={setCustDir} />
               {CountSelect}
             </>

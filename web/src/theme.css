@@ -475,6 +475,20 @@ table.grid tr.group-header.current td:first-child {
   gap: 4px;
   cursor: pointer;
 }
+.cl-none-btn {
+  border: none;
+  background: none;
+  padding: 0;
+  margin-left: 6px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.cl-none-btn:hover {
+  text-decoration: underline;
+  color: var(--ink);
+}
 /* floating panel that never shifts the other filters */
 .cl-panel {
   position: absolute;
@@ -491,8 +505,32 @@ table.grid tr.group-header.current td:first-child {
 }
 .cl-panel-head {
   display: flex;
-  justify-content: flex-end;
-  height: 16px;
+  justify-content: space-between;
+  align-items: center;
+  height: 18px;
+  margin-bottom: 4px;
+}
+.cl-bulk {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.cl-bulk-btn {
+  border: none;
+  background: none;
+  padding: 0 2px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fineday);
+  text-transform: lowercase;
+}
+.cl-bulk-btn:hover {
+  text-decoration: underline;
+}
+.cl-bulk-sep {
+  color: var(--muted);
+  font-size: 11px;
 }
 .cl-close {
   width: 16px;
@@ -2163,3 +2201,68 @@ table.grid.tdjp tbody tr.tdjp-total .sticky-col { background: #16294d; }
 .up-footer { display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-top: 1px solid rgba(255,255,255,0.1); }
 .up-hint { font-size: 12px; color: #aeb8d8; }
 .up-err { font-size: 13px; color: #ff8f8f; font-weight: 700; }
+
+/* ---- Sales-by-country map (Dashboard) ---- */
+.map-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 4px 0 10px;
+  flex-wrap: wrap;
+}
+.map-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.map-crumb {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fineday);
+  padding: 2px 4px;
+  border-radius: 6px;
+}
+.map-crumb:hover:not(:disabled) { text-decoration: underline; }
+.map-crumb.active { color: #e8edf9; cursor: default; }
+.map-crumb:disabled { cursor: default; }
+.map-sep { color: #93a1c4; font-size: 13px; }
+.map-total { text-align: right; line-height: 1.15; }
+.map-total-lbl {
+  display: block;
+  font-size: 11px;
+  color: #93a1c4;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.map-total-val { display: block; font-size: 22px; font-weight: 800; color: #e8edf9; }
+.map-unknown { margin-top: 8px; font-size: 12px; color: #93a1c4; }
+
+/* ---- location review modal (post-refresh: assign country/province/state) ---- */
+.modal.wide { width: 860px; }
+.loc-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.loc-table th, .loc-table td {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: middle;
+}
+.loc-table th { color: var(--muted); font-weight: 600; font-size: 12px; }
+.loc-table td.num, .loc-table th.num { text-align: right; white-space: nowrap; }
+.loc-name {
+  max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink);
+}
+.loc-input {
+  width: 100%; box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: var(--ink);
+  border-radius: 6px; padding: 4px 6px; font-size: 13px;
+}
+.loc-input:focus { border-color: var(--fineday); outline: none; }
+.loc-input.warn { border-color: #e0a13a; }
+.loc-fixed { color: var(--ink); }
+.loc-dim { color: var(--muted); }
