@@ -1,0 +1,65 @@
+{
+  "_comment": "Seed data for the Terra Sales Dashboard PRODUCTION database. Contains ONLY user-configured data (budget + settings/rules/TDJP upside). Deals, pipelines, stages and owners are intentionally NOT here: they repopulate from the HubSpot sync. Regenerate with export-dev.cjs.",
+  "version": 1,
+  "exportedAt": "2026-09-19T17:04:37Z",
+  "source": "development (data.json)",
+  "budgets": {
+    "2026-01": {
+      "budget_amount": 221000,
+      "budget_margin": 160396
+    },
+    "2026-02": {
+      "budget_amount": 235000,
+      "budget_margin": 145968
+    },
+    "2026-03": {
+      "budget_amount": 230000,
+      "budget_margin": 164650
+    },
+    "2026-04": {
+      "budget_amount": 327216,
+      "budget_margin": 184467
+    },
+    "2026-05": {
+      "budget_amount": 227216,
+      "budget_margin": 157478
+    },
+    "2026-06": {
+      "budget_amount": 402216,
+      "budget_margin": 234467
+    },
+    "2026-07": {
+      "budget_amount": 216382,
+      "budget_margin": 134153
+    },
+    "2026-08": {
+      "budget_amount": 229676,
+      "budget_margin": 140920
+    },
+    "2026-09": {
+      "budget_amount": 376667,
+      "budget_margin": 206964
+    },
+    "2026-10": {
+      "budget_amount": 345667,
+      "budget_margin": 233396
+    },
+    "2026-11": {
+      "budget_amount": 264794,
+      "budget_margin": 169969
+    },
+    "2026-12": {
+      "budget_amount": 401382,
+      "budget_margin": 219010
+    }
+  },
+  "settings": {
+    "followup.owner_reminder_repeat_days": "7",
+    "followup.owner_reminder_workdays": "3",
+    "followup.owner_name": "Steven Verver",
+    "display.default_tab": "graphs",
+    "tdjp.upside.2026": "{\"rows\":{\"12\":[0,0,0,0,0,0,0,0,0,0,25,0],\"13\":[0,0,0,0,0,0,0,0,0,0,50,0],\"14\":[0,0,0,0,0,0,0,0,0,0,0,0],\"16\":[0,0,0,0,0,0,0,0,0,0,25,25],\"17\":[0,0,0,0,0,0,0,0,0,0,0,0]},\"updatedAt\":\"2026-09-19T07:10:50.678Z\"}",
+    "notify.new_version_recipients": "nvoostenbrugge@terra-inspectioneering.com",
+    "country.rules.user": "{\"nameRules\":[],\"provinceRules\":[],\"stateRules\":[]}"
+  }
+}

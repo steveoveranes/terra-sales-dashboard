@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Deal, Meta, fmtInt, getDeals } from '../api';
 import MultiSelect from '../components/MultiSelect';
 import CheckList from '../components/CheckList';
@@ -163,6 +163,7 @@ export default function Monthly({
   const [stages, setStages] = useState<string[]>([]);
   const [search, setSearch] = useState('');
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => LS.get<Record<string, boolean>>('tsd.collapsed') || {});
+  const didInitCollapse = useRef(false);
   const [onlyRed, setOnlyRed] = useState(false);
   const [legendOpen, setLegendOpen] = useState(false);
 
@@ -256,6 +257,21 @@ export default function Monthly({
   useEffect(() => {
     if (!ownerOptions.length && !pipelineOptions.length && !stageOptions.length) return;
     const hidden = new Set((meta?.defaultHiddenStages || []).map((s) => s.trim().toLowerCase()));
+    const defaultStages = () => stageOptions.filter((s) => !hidden.has(s.trim().toLowerCase()));
+
+    // one-shot "drill" coming from a click on a Dashboard chart: filter to just that item,
+    // reset the other filters to their defaults, and expand all months so the result shows.
+    const drill = LS.get<{ by: string; value: string }>('tsd.drill');
+    if (drill && drill.value) {
+      LS.set('tsd.drill', null);
+      setOwners(drill.by === 'owner' ? ownerOptions.filter((o) => o === drill.value) : ownerOptions);
+      setPipelines(drill.by === 'pipeline' ? pipelineOptions.filter((o) => o === drill.value) : pipelineOptions);
+      setStages(drill.by === 'stage' ? stageOptions.filter((o) => o === drill.value) : defaultStages());
+      setSearch(drill.by === 'customer' ? drill.value : '');
+      setCollapsed({}); // show every month expanded for the drilled-in view
+      didInitCollapse.current = true;
+      return;
+    }
 
     const savedO = LS.get<string[]>('tsd.owners.current2');
     const savedP = LS.get<string[]>('tsd.pipelines.current');
@@ -357,6 +373,17 @@ export default function Monthly({
       };
     });
   }, [filtered, cur, sort]);
+
+  // Default view: collapse every month and leave only the current month expanded.
+  // Runs once, the first time groups are available (a fresh open of the page); after
+  // that the user's own expand/collapse choices apply.
+  useEffect(() => {
+    if (didInitCollapse.current || !groups.length) return;
+    const next: Record<string, boolean> = {};
+    for (const g of groups) next[g.key] = g.key !== cur; // true = collapsed
+    setCollapsed(next);
+    didInitCollapse.current = true;
+  }, [groups, cur]);
 
   const grand = useMemo(
     () =>

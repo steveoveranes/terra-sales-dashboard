@@ -496,6 +496,7 @@ function ChartBlock({
   option,
   downloadName,
   empty,
+  onEvents,
 }: {
   title: string;
   hint?: string;
@@ -505,6 +506,7 @@ function ChartBlock({
   option: any;
   downloadName: string;
   empty?: boolean;
+  onEvents?: Record<string, (p: any) => void>;
 }) {
   const ref = useRef<EChartHandle>(null);
   return (
@@ -530,7 +532,7 @@ function ChartBlock({
         </>
       }
     >
-      {empty ? <div className="empty small">No data</div> : <EChart ref={ref} option={option} height={height} />}
+      {empty ? <div className="empty small">No data</div> : <EChart ref={ref} option={option} height={height} onEvents={onEvents} />}
     </Card>
   );
 }
@@ -637,11 +639,16 @@ export default function Graphs({
   year,
   refreshKey,
   meta,
+  onDrill,
 }: {
   year: number;
   refreshKey: number;
   meta: Meta | null;
+  onDrill?: (by: 'owner' | 'pipeline' | 'stage' | 'customer', value: string) => void;
 }) {
+  // click a bar in a chart -> open Monthly overview filtered to that item
+  const drillEvents = (by: 'owner' | 'pipeline' | 'stage' | 'customer') =>
+    onDrill ? { click: (p: any) => { if (p && typeof p.name === 'string') onDrill(by, p.name); } } : undefined;
   const [byYear, setByYear] = useState<Record<number, Deal[]>>({});
   const [budget, setBudget] = useState<Budget | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1327,53 +1334,58 @@ export default function Graphs({
         </div>
 
         <ChartBlock
-          title="Gross sales by category"
-          hint="Gross sales distribution"
+          title="Gross sales by pipeline"
+          hint="Gross sales distribution · click to open Monthly for that pipeline"
           downloadName="revenue-by-category"
           height={320}
           option={pipelineOption}
           empty={!pipeData.length}
           controls={<Seg value={pipeChart} options={[{ key: 'donut', label: 'Donut' }, { key: 'bar', label: 'Bar' }]} onChange={setPipeChart} />}
+          onEvents={drillEvents('pipeline')}
         />
 
         <ChartBlock
           title="Gross sales by deal stage"
-          hint="Where the gross sales sit in the funnel"
+          hint="Where the gross sales sit in the funnel · click to open Monthly for that stage"
           downloadName="revenue-by-deal-stage"
           height={barHeight(stageData.length)}
           option={stageOption}
           empty={!stageData.length}
+          onEvents={drillEvents('stage')}
         />
 
         <ChartBlock
           title="Margin by pipeline"
-          hint="Profitability by pipeline"
+          hint="Profitability by pipeline · click to open Monthly for that pipeline"
           downloadName="margin-by-pipeline"
           height={barHeight(marginPctRows.length)}
           option={marginPctOption}
           empty={!marginPctRows.length}
+          onEvents={drillEvents('pipeline')}
         />
 
         <ChartBlock
           title="Sales per account manager"
-          hint="Sorted by the chosen metric"
+          hint="Sorted by the chosen metric · click to open Monthly for that manager"
           downloadName="account-manager-performance"
           height={barHeight(amRows.length)}
           option={amOption}
           empty={!amRows.length}
           controls={<Seg value={amMetric} options={metricOpts} onChange={setAmMetric} />}
+          onEvents={drillEvents('owner')}
         />
 
         <SalesMap deals={fThis} rules={meta?.countryRules} />
 
         <ChartBlock
           title="Sales per customer"
-          hint={`${custDir === 'top' ? 'Top' : 'Bottom'} ${Math.min(custCount, totalCustomers)} of ${totalCustomers} customers`}
+          hint={`${custDir === 'top' ? 'Top' : 'Bottom'} ${Math.min(custCount, totalCustomers)} of ${totalCustomers} customers · click to open Monthly for that customer`}
           wide
           downloadName="sales-per-customer"
           height={barHeight(customerRows(custMetric).length)}
           option={customerOption(custMetric)}
           empty={!fThis.length}
+          onEvents={drillEvents('customer')}
           controls={
             <>
               <Seg

@@ -2274,5 +2274,8 @@ table.grid.tdjp tbody tr.tdjp-total .sticky-col { background: #16294d; }
 }
 .loc-input:focus { border-color: var(--fineday); outline: none; }
 .loc-input.warn { border-color: #e0a13a; }
+/* native <select> option list renders on a white OS popup, so force dark text there
+   (otherwise the light --ink option text is unreadable on white) */
+.loc-input option { color: #14224b; background: #ffffff; }
 .loc-fixed { color: var(--ink); }
 .loc-dim { color: var(--muted); }

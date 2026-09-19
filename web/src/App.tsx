@@ -91,6 +91,18 @@ export default function App() {
     }
   }
 
+  // Jump from a Dashboard chart straight into Monthly overview, filtered to the clicked
+  // item. Monthly reads this one-shot "drill" key when it mounts and applies it (all
+  // other filters reset to their defaults for a clean, predictable view).
+  function drillToMonthly(by: 'owner' | 'pipeline' | 'stage' | 'customer', value: string) {
+    try {
+      localStorage.setItem('tsd.drill', JSON.stringify({ by, value }));
+    } catch {
+      /* ignore */
+    }
+    setTab('monthly');
+  }
+
   const lastSync = sync?.lastSyncAt ? new Date(sync.lastSyncAt).toLocaleString() : 'never';
 
   return (
@@ -137,7 +149,7 @@ export default function App() {
       <div className="content">
         {tab === 'raw' && <RawData year={year} refreshKey={refreshKey} />}
         {tab === 'monthly' && <Monthly year={year} refreshKey={refreshKey} meta={meta} />}
-        {tab === 'graphs' && <Graphs year={year} refreshKey={refreshKey} meta={meta} />}
+        {tab === 'graphs' && <Graphs year={year} refreshKey={refreshKey} meta={meta} onDrill={drillToMonthly} />}
         {tab === 'tdjp' && <Tdjp year={year} refreshKey={refreshKey} defaultCurrency={meta?.defaultCurrency} />}
         {tab === 'ideas' && <Ideas refreshKey={refreshKey} />}
         {tab === 'settings' && <Settings refreshKey={refreshKey} year={year} />}
