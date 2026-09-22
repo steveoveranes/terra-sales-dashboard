@@ -115,17 +115,28 @@ function CheckboxMenu({
   options,
   selected,
   onChange,
+  allValue,
 }: {
   options: string[];
   selected: string[];
   onChange: (v: string[]) => void;
+  // what "all" selects; defaults to every option. For deal stage this excludes the
+  // default-hidden stages (suspect / closed lost) so they only show when ticked.
+  allValue?: string[];
 }) {
-  const all = options.length > 0 && selected.length === options.length;
+  const allSet = allValue ?? options;
   return (
     <div className="cbmenu">
-      <label className="ms-opt ms-all">
-        <input type="checkbox" checked={all} onChange={() => onChange(all ? [] : [...options])} /> All
-      </label>
+      {/* "all · none" quick links, matching the main filter panels (CheckList) */}
+      <div className="cl-bulk">
+        <button type="button" className="cl-bulk-btn" onClick={() => onChange([...allSet])} title="Select all">
+          all
+        </button>
+        <span className="cl-bulk-sep">·</span>
+        <button type="button" className="cl-bulk-btn" onClick={() => onChange([])} title="Select none">
+          none
+        </button>
+      </div>
       <div className="ms-divider" />
       <div className="ms-scroll">
         {options.map((o) => (
@@ -225,7 +236,8 @@ export default function Monthly({
     // include a "(No owner)" bucket so deals without an account manager don't
     // silently drop out of the overview (they'd otherwise match no filter option)
     const hasNone = deals.some((d) => !d.owner || !d.owner.trim());
-    return hasNone ? [...named, NO_OWNER] : named;
+    // put "(No owner)" first so it's easy to find and quick to select
+    return hasNone ? [NO_OWNER, ...named] : named;
   }, [deals]);
   const ownerKey = (d: Deal) => (d.owner && d.owner.trim() ? d.owner : NO_OWNER);
   const pipelineOptions = useMemo(
@@ -252,6 +264,15 @@ export default function Monthly({
     }
     return canonical.sort((a, b) => a.localeCompare(b));
   }, [deals]);
+
+  // What "all" means for the DEAL STAGE filter: every stage EXCEPT the ones hidden by
+  // default (e.g. "suspect", "closed lost"). Those must never show up just because the
+  // user hits "all" — only when they explicitly tick them. Owner/pipeline "all" stays
+  // literally everything.
+  const stageAllValue = useMemo(() => {
+    const hidden = new Set((meta?.defaultHiddenStages || []).map((s) => s.trim().toLowerCase()));
+    return stageOptions.filter((s) => !hidden.has(s.trim().toLowerCase()));
+  }, [stageOptions, meta]);
 
   // (re)initialise filter selections whenever the data set or defaults change.
   useEffect(() => {
@@ -544,7 +565,7 @@ export default function Monthly({
           columns={3}
           rememberedSubset={pipesSub}
         />
-        <MultiSelect label="Deal stage" options={stageOptions} selected={stages} onChange={setStages} />
+        <MultiSelect label="Deal stage" options={stageOptions} selected={stages} onChange={setStages} allValue={stageAllValue} />
         <div className="filter-right">
           <label className="toggle-chip" title="Show only deals that need attention (red)">
             <input type="checkbox" checked={onlyRed} onChange={(e) => setOnlyRed(e.target.checked)} />
@@ -653,7 +674,7 @@ export default function Monthly({
                     sortDir={sortDir('deal_stage')}
                     onCycleSort={() => cycleSort('deal_stage')}
                     filterActive={stageFilterActive}
-                    renderMenu={() => <CheckboxMenu options={stageOptions} selected={stages} onChange={setStages} />}
+                    renderMenu={() => <CheckboxMenu options={stageOptions} selected={stages} onChange={setStages} allValue={stageAllValue} />}
                   />
                 </th>
                 <th>

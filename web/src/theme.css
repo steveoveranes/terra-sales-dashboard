@@ -1205,6 +1205,18 @@ table.grid.tdjp thead .sticky-col {
 .gcard.wide {
   grid-column: 1 / -1;
 }
+.pair2 {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  min-width: 0;
+}
+@media (max-width: 640px) {
+  .pair2 {
+    grid-template-columns: 1fr;
+  }
+}
 .gcard-head {
   display: flex;
   justify-content: space-between;
@@ -2252,7 +2264,7 @@ table.grid.tdjp tbody tr.tdjp-total .sticky-col { background: #16294d; }
 .map-unknown { margin-top: 8px; font-size: 12px; color: #93a1c4; }
 
 /* ---- location review modal (post-refresh: assign country/province/state) ---- */
-.modal.wide { width: 860px; }
+.modal.wide { width: 1040px; }
 .loc-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .loc-table th, .loc-table td {
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
@@ -2263,7 +2275,11 @@ table.grid.tdjp tbody tr.tdjp-total .sticky-col { background: #16294d; }
 .loc-table th { color: var(--muted); font-weight: 600; font-size: 12px; }
 .loc-table td.num, .loc-table th.num { text-align: right; white-space: nowrap; }
 .loc-name {
-  max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink);
+  /* wider now, and wraps onto a second line when needed (clamped at 2 lines,
+     full text still available on hover via the title attribute) */
+  max-width: 420px; color: var(--ink);
+  white-space: normal; overflow: hidden; overflow-wrap: anywhere; line-height: 1.3;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
 }
 .loc-input {
   width: 100%; box-sizing: border-box;

@@ -19,10 +19,12 @@ import { Deal } from './api';
  */
 
 // Learned 2026-09: Bureau Veritas and Mistras are always one customer;
+// TDBR is one customer too (merges "TDBR UT projects", "TDBR ScoutDI", and any
+// other "TDBR …" variant into a single "TDBR").
 // VOPAK is deliberately kept per site, so it is NOT listed here.
 // MODEC is deliberately split into two customers ("MODEC" operational vs
 // "MODEC R&D") — handled by modecCategory() below, so it is NOT listed here.
-export const PREFIX_ALIASES: string[] = ['Bureau Veritas', 'Mistras'];
+export const PREFIX_ALIASES: string[] = ['Bureau Veritas', 'Mistras', 'TDBR'];
 
 // Learned 2026-09: MODEC is two customers, not one:
 //  - "MODEC R&D"                      : the R&D / engineering work we do for MODEC

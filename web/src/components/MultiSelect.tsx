@@ -5,11 +5,15 @@ export default function MultiSelect({
   options,
   selected,
   onChange,
+  allValue,
 }: {
   label: string;
   options: string[];
   selected: string[];
   onChange: (v: string[]) => void;
+  // what "All" selects; defaults to every option. For deal stage this excludes the
+  // default-hidden stages (suspect / closed lost) so they only show when ticked.
+  allValue?: string[];
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -22,7 +26,11 @@ export default function MultiSelect({
     return () => document.removeEventListener('mousedown', onDoc);
   }, []);
 
-  const allSelected = options.length > 0 && selected.length === options.length;
+  const allSet = allValue ?? options;
+  const literalAll = options.length > 0 && selected.length === options.length;
+  const isDefaultAll =
+    allSet.length > 0 && selected.length === allSet.length && allSet.every((o) => selected.includes(o));
+  const allSelected = literalAll || isDefaultAll;
   const summary =
     selected.length === 0 ? 'None' : allSelected ? 'All' : `${selected.length} of ${options.length}`;
 
@@ -31,7 +39,7 @@ export default function MultiSelect({
     else onChange([...selected, opt]);
   }
   function toggleAll() {
-    onChange(allSelected ? [] : [...options]);
+    onChange(allSelected ? [] : [...allSet]);
   }
 
   return (

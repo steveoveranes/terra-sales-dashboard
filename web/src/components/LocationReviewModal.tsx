@@ -89,8 +89,9 @@ export default function LocationReviewModal({
       if (!kw) return false;
       const eff = r.country || r.derivedCountry;
       if (!eff) return false;
-      if (eff === 'NL' || eff === 'DE') return !!r.sub;
-      return !r.derivedCountry; // a plain country assignment for an unknown-country deal
+      const willNameRule = !!r.country && r.country !== r.derivedCountry;
+      const willSubRule = (eff === 'NL' || eff === 'DE') && !!r.sub;
+      return willNameRule || willSubRule;
     }).length;
   }, [rows]);
 
@@ -104,7 +105,10 @@ export default function LocationReviewModal({
     for (const r of rows) {
       const kw = r.keyword.trim().toLowerCase();
       if (!kw) continue;
-      if (!r.derivedCountry && r.country) payload.nameRules.push({ contains: kw, country: r.country });
+      // Write a country (name) rule whenever the user set a country that differs from
+      // what was auto-derived — this covers both "no country known" and "override the
+      // guessed country" (name rules take precedence over the pipeline default).
+      if (r.country && r.country !== r.derivedCountry) payload.nameRules.push({ contains: kw, country: r.country });
       const eff = r.country || r.derivedCountry;
       if (eff === 'NL' && r.sub) payload.provinceRules.push({ contains: kw, province: r.sub });
       if (eff === 'DE' && r.sub) payload.stateRules.push({ contains: kw, state: r.sub });
@@ -177,18 +181,17 @@ export default function LocationReviewModal({
                         />
                       </td>
                       <td>
-                        {r.derivedCountry ? (
-                          <span className="loc-fixed">{COUNTRY_META[r.derivedCountry]?.name || r.derivedCountry}</span>
-                        ) : (
-                          <select className="loc-input" value={r.country} onChange={(e) => set(r.id, { country: e.target.value, sub: '' })}>
-                            <option value="">— choose —</option>
-                            {COUNTRY_OPTIONS.map((c) => (
-                              <option key={c.code} value={c.code}>
-                                {c.name}
-                              </option>
-                            ))}
-                          </select>
-                        )}
+                        {/* Always editable: the guessed country is pre-selected, but the
+                            user can override it (e.g. a pipeline-default NL deal that is
+                            really in DE). A change is saved as a name rule that overrides. */}
+                        <select className="loc-input" value={r.country} onChange={(e) => set(r.id, { country: e.target.value, sub: '' })}>
+                          <option value="">— choose —</option>
+                          {COUNTRY_OPTIONS.map((c) => (
+                            <option key={c.code} value={c.code}>
+                              {c.name}
+                            </option>
+                          ))}
+                        </select>
                       </td>
                       <td>
                         {subList ? (

@@ -34,7 +34,13 @@ export default function ColumnHead({
       if (btnRef.current?.contains(t)) return;
       setOpen(false);
     }
-    function onScroll() {
+    function onScroll(e: Event) {
+      // Only close when the page/table BEHIND the menu scrolls (the menu is
+      // fixed-positioned, so it would otherwise detach). Scrolling INSIDE the menu
+      // itself — e.g. the owner list's own scrollbar or the mouse wheel over it —
+      // must keep it open.
+      const t = e.target as Node | null;
+      if (menuRef.current && t && menuRef.current.contains(t)) return;
       setOpen(false);
     }
     function onKey(e: KeyboardEvent) {

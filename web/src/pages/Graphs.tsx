@@ -770,6 +770,12 @@ export default function Graphs({
     () => [...new Set(allDeals.map((d) => d.deal_stage).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
     [allDeals]
   );
+  // "All" for deal stage excludes the default-hidden stages (suspect / closed lost) so
+  // they only appear when the user ticks them explicitly.
+  const stageAllValue = useMemo(() => {
+    const hidden = new Set((meta?.defaultHiddenStages || []).map((s) => s.trim().toLowerCase()));
+    return stageOptions.filter((s) => !hidden.has(s.trim().toLowerCase()));
+  }, [stageOptions, meta]);
 
   // initialise selections once options are known
   useEffect(() => {
@@ -1270,7 +1276,7 @@ export default function Graphs({
         </select>
         <MultiSelect label="Pipeline" options={pipelineOptions} selected={pipelines} onChange={setPipelines} />
         <MultiSelect label="Account manager" options={ownerOptions} selected={owners} onChange={setOwners} />
-        <MultiSelect label="Deal stage" options={stageOptions} selected={stages} onChange={setStages} />
+        <MultiSelect label="Deal stage" options={stageOptions} selected={stages} onChange={setStages} allValue={stageAllValue} />
         <input className="gsearch" placeholder="Search deal / customer…" value={search} onChange={(e) => setSearch(e.target.value)} />
         <label className="toggle-chip" title="Include deals without an execution date (bucketed by close date)">
           <input type="checkbox" checked={includeNoExec} onChange={(e) => setIncludeNoExec(e.target.checked)} />
@@ -1345,13 +1351,17 @@ export default function Graphs({
         />
 
         <ChartBlock
-          title="Gross sales by deal stage"
-          hint="Where the gross sales sit in the funnel · click to open Monthly for that stage"
-          downloadName="revenue-by-deal-stage"
-          height={barHeight(stageData.length)}
-          option={stageOption}
-          empty={!stageData.length}
-          onEvents={drillEvents('stage')}
+          title="Year-over-year"
+          hint="Compare years"
+          downloadName="year-over-year"
+          height={360}
+          option={yoyOption}
+          controls={
+            <>
+              <Seg value={yoyMetric} options={[{ key: 'revenue', label: 'Gross' }, { key: 'margin', label: 'Nett' }]} onChange={setYoyMetric} />
+              <Seg value={yoyMode} options={[{ key: 'monthly', label: 'Monthly' }, { key: 'cumulative', label: 'Cumulative' }]} onChange={setYoyMode} />
+            </>
+          }
         />
 
         <ChartBlock
@@ -1377,10 +1387,10 @@ export default function Graphs({
 
         <SalesMap deals={fThis} rules={meta?.countryRules} />
 
+        <div className="pair2">
         <ChartBlock
           title="Sales per customer"
           hint={`${custDir === 'top' ? 'Top' : 'Bottom'} ${Math.min(custCount, totalCustomers)} of ${totalCustomers} customers · click to open Monthly for that customer`}
-          wide
           downloadName="sales-per-customer"
           height={barHeight(customerRows(custMetric).length)}
           option={customerOption(custMetric)}
@@ -1400,19 +1410,15 @@ export default function Graphs({
         />
 
         <ChartBlock
-          title="Year-over-year"
-          hint="Compare years"
-          wide
-          downloadName="year-over-year"
-          height={360}
-          option={yoyOption}
-          controls={
-            <>
-              <Seg value={yoyMetric} options={[{ key: 'revenue', label: 'Gross' }, { key: 'margin', label: 'Nett' }]} onChange={setYoyMetric} />
-              <Seg value={yoyMode} options={[{ key: 'monthly', label: 'Monthly' }, { key: 'cumulative', label: 'Cumulative' }]} onChange={setYoyMode} />
-            </>
-          }
+          title="Gross sales by deal stage"
+          hint="Where the gross sales sit in the funnel · click to open Monthly for that stage"
+          downloadName="revenue-by-deal-stage"
+          height={barHeight(stageData.length)}
+          option={stageOption}
+          empty={!stageData.length}
+          onEvents={drillEvents('stage')}
         />
+        </div>
       </div>
     </div>
   );
