@@ -12,6 +12,11 @@
 #  You can also trigger a push by hand: just save any change to PUSH.trigger.
 #
 #  .env, build logs and the trigger files are skipped automatically (.gitignore).
+#
+#  Build number: just before committing, this script stamps web\src\buildInfo.ts
+#  with the next build number (scripts/genbuild.mjs) and commits it. That committed
+#  value is the single source of truth, so dev and production always show the same
+#  build number for the same code. The number therefore bumps once per push.
 # ============================================================================
 
 $ErrorActionPreference = 'Continue'
@@ -40,6 +45,11 @@ function Invoke-Push {
   $msg = $msg.Trim()
 
   Push-Location $Src
+  # Stamp the build number into web\src\buildInfo.ts so it travels with the commit.
+  # Every push bumps it by one; dev and production both compile this committed value,
+  # so the live build number always matches the one you see locally.
+  Log "stamp build number (web\scripts\genbuild.mjs)"
+  & cmd /c "node web\scripts\genbuild.mjs" *>> $Log
   Log "git add -A"
   & cmd /c "git add -A" *>> $Log
   Log ("git commit -m ""{0}""" -f $msg)

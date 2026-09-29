@@ -51,6 +51,7 @@ export function stateOf(d: Deal, rules?: CountryRules | null): string {
 // [lon, lat] used to frame the map when drilling into a country.
 export const COUNTRY_META: Record<string, { name: string; lon: number; lat: number }> = {
   NL: { name: 'Netherlands', lon: 5.3, lat: 52.15 },
+  LU: { name: 'Luxembourg', lon: 6.13, lat: 49.81 },
   DE: { name: 'Germany', lon: 10.4, lat: 51.2 },
   BE: { name: 'Belgium', lon: 4.5, lat: 50.6 },
   FR: { name: 'France', lon: 2.5, lat: 46.6 },
